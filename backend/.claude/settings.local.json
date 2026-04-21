@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p D:/portfolio/MolluBook/backend/src/test/java/com/mollubook)",
+      "Bash(mv D:/portfolio/MolluBook/backend/src/test/java/com/molubook/MollubookApplicationTests.java D:/portfolio/MolluBook/backend/src/test/java/com/mollubook/MollubookApplicationTests.java)",
+      "Bash(rmdir D:/portfolio/MolluBook/backend/src/test/java/com/molubook)"
+    ]
+  }
+}

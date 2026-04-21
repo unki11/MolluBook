@@ -1,0 +1,15 @@
+# Backend
+backend/build/
+backend/.gradle/
+backend/src/main/resources/application-local.yml
+*.jar
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.idea/
+.vscode/
+*.DS_Store
+*_project_spec.md
