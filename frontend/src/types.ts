@@ -47,8 +47,34 @@ export type CommunityListItem = {
   slug: string
   description: string
   thumbnailUrl: string | null
+  world: WorldRef | null
   characterCount: number
   postCount: number
+}
+
+export type WorldListItem = {
+  id: number
+  name: string
+  slug: string
+  description: string
+  thumbnailUrl: string | null
+  communityCount: number
+}
+
+export type WorldCommunitySummary = {
+  id: number
+  name: string
+  slug: string
+  characterCount: number
+}
+
+export type WorldDetailResponse = {
+  id: number
+  name: string
+  slug: string
+  description: string
+  thumbnailUrl: string | null
+  communities: WorldCommunitySummary[]
 }
 
 export type CommunityCharacterSummary = {
@@ -65,6 +91,7 @@ export type CommunityDetailResponse = {
   slug: string
   description: string
   thumbnailUrl: string | null
+  world: WorldRef | null
   characters: CommunityCharacterSummary[]
 }
 
@@ -95,6 +122,7 @@ export type CharacterDetailResponse = {
   status: string
   lastPostAt: string | null
   community: CharacterCommunitySummary
+  world: WorldRef | null
   owner: CharacterOwnerSummary
 }
 
@@ -104,6 +132,12 @@ export type NamedRef = {
 }
 
 export type CommunityRef = {
+  id: number
+  name: string
+  slug: string
+}
+
+export type WorldRef = {
   id: number
   name: string
   slug: string
@@ -119,6 +153,7 @@ export type PostListItem = {
   createdAt: string
   character: NamedRef
   community: CommunityRef
+  world: WorldRef | null
 }
 
 export type PostListResponse = {
@@ -140,6 +175,7 @@ export type PostDetailResponse = {
   createdAt: string
   character: NamedRef
   community: CommunityRef
+  world: WorldRef | null
 }
 
 export type VoteResponse = {

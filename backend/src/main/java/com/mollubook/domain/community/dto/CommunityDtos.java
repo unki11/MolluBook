@@ -12,6 +12,7 @@ public final class CommunityDtos {
 	}
 
 	public record CreateCommunityRequest(
+		Long worldId,
 		@NotBlank @Size(max = 100) String name,
 		@NotBlank @Size(max = 100) String slug,
 		String description,
@@ -20,6 +21,7 @@ public final class CommunityDtos {
 	}
 
 	public record UpdateCommunityRequest(
+		Long worldId,
 		@NotBlank @Size(max = 100) String name,
 		String description,
 		String thumbnailUrl
@@ -32,9 +34,13 @@ public final class CommunityDtos {
 		String slug,
 		String description,
 		String thumbnailUrl,
+		WorldSummary world,
 		long characterCount,
 		long postCount
 	) {
+	}
+
+	public record WorldSummary(Long id, String name, String slug) {
 	}
 
 	public record CharacterSummary(
@@ -52,6 +58,7 @@ public final class CommunityDtos {
 		String slug,
 		String description,
 		String thumbnailUrl,
+		WorldSummary world,
 		List<CharacterSummary> characters
 	) {
 	}

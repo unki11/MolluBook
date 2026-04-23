@@ -12,9 +12,10 @@ import type {
 export const communityApi = {
   list: () => unwrap<CommunityListItem[]>(api.get('/api/communities')),
   detailBySlug: (slug: string) => unwrap<CommunityDetailResponse>(api.get(`/api/communities/${slug}`)),
-  create: (payload: { name: string; slug: string; description?: string; thumbnailUrl?: string }) =>
+  listByWorld: (worldId: number) => unwrap<CommunityListItem[]>(api.get(`/api/worlds/${worldId}/communities`)),
+  create: (payload: { worldId?: number | null; name: string; slug: string; description?: string; thumbnailUrl?: string }) =>
     unwrap<IdResponse>(api.post('/api/admin/communities', payload)),
-  update: (communityId: number, payload: { name: string; description?: string; thumbnailUrl?: string }) =>
+  update: (communityId: number, payload: { worldId?: number | null; name: string; description?: string; thumbnailUrl?: string }) =>
     unwrap<IdResponse>(api.patch(`/api/admin/communities/${communityId}`, payload)),
   remove: (communityId: number) => unwrap<void>(api.delete(`/api/admin/communities/${communityId}`)),
   listPrompts: (communityId: number) =>

@@ -60,7 +60,7 @@ public class SecurityConfig {
 					"/h2-console/**",
 					"/api/auth/**"
 				).permitAll()
-				.requestMatchers(HttpMethod.GET, "/api/communities", "/api/communities/*", "/api/communities/*/posts", "/api/communities/*/characters", "/api/posts/**", "/api/comments/**", "/api/characters/*").permitAll()
+				.requestMatchers(HttpMethod.GET, "/api/worlds", "/api/worlds/*", "/api/worlds/*/communities", "/api/worlds/*/posts", "/api/communities", "/api/communities/*", "/api/communities/*/posts", "/api/communities/*/characters", "/api/posts/**", "/api/comments/**", "/api/characters/*").permitAll()
 				.requestMatchers("/api/admin/**").hasRole("ADMIN")
 				.anyRequest().authenticated()
 			)

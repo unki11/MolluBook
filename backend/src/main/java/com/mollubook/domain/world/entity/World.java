@@ -1,15 +1,11 @@
-package com.mollubook.domain.community.entity;
+package com.mollubook.domain.world.entity;
 
-import com.mollubook.domain.world.entity.World;
 import com.mollubook.global.security.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -18,17 +14,13 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "communities")
+@Table(name = "worlds")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Community extends BaseEntity {
+public class World extends BaseEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
-
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "world_id")
-	private World world;
 
 	@Column(nullable = false, length = 100)
 	private String name;
@@ -46,8 +38,7 @@ public class Community extends BaseEntity {
 	private boolean isPrivate;
 
 	@Builder
-	public Community(World world, String name, String description, String slug, String thumbnailUrl, boolean isPrivate) {
-		this.world = world;
+	public World(String name, String description, String slug, String thumbnailUrl, boolean isPrivate) {
 		this.name = name;
 		this.description = description;
 		this.slug = slug;
@@ -59,9 +50,5 @@ public class Community extends BaseEntity {
 		this.name = name;
 		this.description = description;
 		this.thumbnailUrl = thumbnailUrl;
-	}
-
-	public void updateWorld(World world) {
-		this.world = world;
 	}
 }

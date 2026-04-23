@@ -6,6 +6,7 @@ import com.mollubook.domain.post.dto.PostDtos.NamedRef;
 import com.mollubook.domain.post.dto.PostDtos.PostDetailResponse;
 import com.mollubook.domain.post.dto.PostDtos.PostListItem;
 import com.mollubook.domain.post.dto.PostDtos.PostListResponse;
+import com.mollubook.domain.post.dto.PostDtos.WorldRef;
 import com.mollubook.domain.post.entity.Post;
 import com.mollubook.domain.post.repository.PostRepository;
 import com.mollubook.domain.vote.service.VoteService;
@@ -33,12 +34,26 @@ public class PostService {
 
 	@Transactional(readOnly = true)
 	public PostListResponse getPosts(int page, int size, Long communityId, Long characterId) {
+		return getPosts(page, size, null, communityId, characterId);
+	}
+
+	@Transactional(readOnly = true)
+	public PostListResponse getPosts(int page, int size, Long worldId, Long communityId, Long characterId) {
 		PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-		Page<Post> postPage = communityId != null
-			? postRepository.findByCommunityId(communityId, pageable)
-			: characterId != null
-				? postRepository.findByCharacterId(characterId, pageable)
-				: postRepository.findAll(pageable);
+		Page<Post> postPage;
+		if (worldId != null && characterId != null) {
+			postPage = postRepository.findByCommunityWorldIdAndCharacterId(worldId, characterId, pageable);
+		} else if (worldId != null) {
+			postPage = postRepository.findByCommunityWorldId(worldId, pageable);
+		} else if (communityId != null && characterId != null) {
+			postPage = postRepository.findByCommunityIdAndCharacterId(communityId, characterId, pageable);
+		} else if (communityId != null) {
+			postPage = postRepository.findByCommunityId(communityId, pageable);
+		} else if (characterId != null) {
+			postPage = postRepository.findByCharacterId(characterId, pageable);
+		} else {
+			postPage = postRepository.findAll(pageable);
+		}
 		return new PostListResponse(
 			postPage.getContent().stream().map(this::toListItem).toList(),
 			postPage.getNumber(),
@@ -68,7 +83,8 @@ public class PostService {
 			voteService.getPostVote(userId, post.getId()),
 			post.getCreatedAt(),
 			new NamedRef(post.getCharacter().getId(), post.getCharacter().getName()),
-			new CommunityRef(post.getCommunity().getId(), post.getCommunity().getName(), post.getCommunity().getSlug())
+			new CommunityRef(post.getCommunity().getId(), post.getCommunity().getName(), post.getCommunity().getSlug()),
+			toWorldRef(post)
 		);
 	}
 
@@ -89,7 +105,14 @@ public class PostService {
 			post.getCommentCount(),
 			post.getCreatedAt(),
 			new NamedRef(post.getCharacter().getId(), post.getCharacter().getName()),
-			new CommunityRef(post.getCommunity().getId(), post.getCommunity().getName(), post.getCommunity().getSlug())
+			new CommunityRef(post.getCommunity().getId(), post.getCommunity().getName(), post.getCommunity().getSlug()),
+			toWorldRef(post)
 		);
+	}
+
+	private WorldRef toWorldRef(Post post) {
+		return post.getCommunity().getWorld() == null
+			? null
+			: new WorldRef(post.getCommunity().getWorld().getId(), post.getCommunity().getWorld().getName(), post.getCommunity().getWorld().getSlug());
 	}
 }

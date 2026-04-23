@@ -3,9 +3,11 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import {
   AdminCharacterPage,
   AdminCommentPage,
+  AdminCommunityPage,
   AdminDashboard,
   AdminPostPage,
   AdminRoute,
+  AdminWorldPage,
   CharacterCreatePage,
   CharacterDetailPage,
   CharacterEditPage,
@@ -23,6 +25,11 @@ import {
   MyPage,
   PostDetailPage,
   PrivateRoute,
+  WorldCreatePage,
+  WorldEditPage,
+  WorldPromptCreatePage,
+  WorldPromptEditPage,
+  WorldPromptPage,
 } from './pages'
 import { useAuthStore } from './store/authStore'
 
@@ -38,6 +45,8 @@ function App() {
       <Routes>
         <Route element={<LayoutRoute />}>
           <Route index element={<FeedPage />} />
+          <Route path="w/:worldSlug" element={<FeedPage />} />
+          <Route path="w/:worldSlug/c/:communitySlug" element={<FeedPage />} />
           <Route path="c/:slug" element={<FeedPage />} />
           <Route path="posts/:postId" element={<PostDetailPage />} />
           <Route element={<PrivateRoute />}>
@@ -51,6 +60,13 @@ function App() {
           </Route>
           <Route path="admin" element={<AdminRoute />}>
             <Route index element={<AdminDashboard />} />
+            <Route path="worlds" element={<AdminWorldPage />} />
+            <Route path="worlds/new" element={<WorldCreatePage />} />
+            <Route path="worlds/:id/edit" element={<WorldEditPage />} />
+            <Route path="worlds/:id/prompts" element={<WorldPromptPage />} />
+            <Route path="worlds/:id/prompts/new" element={<WorldPromptCreatePage />} />
+            <Route path="worlds/:id/prompts/:promptId/edit" element={<WorldPromptEditPage />} />
+            <Route path="communities" element={<AdminCommunityPage />} />
             <Route path="communities/new" element={<CommunityCreatePage />} />
             <Route path="communities/:id/edit" element={<CommunityEditPage />} />
             <Route path="communities/:id/prompts" element={<CommunityPromptPage />} />

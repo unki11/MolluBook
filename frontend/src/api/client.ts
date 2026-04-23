@@ -26,6 +26,21 @@ export const api = axios.create({
   withCredentials: true,
 })
 
+export function extractApiErrorMessage(error: unknown) {
+  if (axios.isAxiosError<ApiResponse<unknown>>(error)) {
+    const apiMessage = error.response?.data?.error?.message
+    if (apiMessage) {
+      return apiMessage
+    }
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  return '요청 처리에 실패했습니다.'
+}
+
 api.interceptors.request.use((config) => {
   const token = tokenStorage.getAccessToken()
   if (token) {

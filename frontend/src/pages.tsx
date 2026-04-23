@@ -7,12 +7,14 @@ import {
   useLocation,
   useNavigate,
   useParams,
+  useSearchParams,
 } from 'react-router-dom'
 import { characterApi } from './api/character'
 import { commentApi } from './api/comment'
 import { communityApi } from './api/community'
 import { postApi } from './api/post'
 import { userApi } from './api/user'
+import { worldApi } from './api/world'
 import {
   AdminFrame,
   AppFrame,
@@ -25,7 +27,7 @@ import {
   SectionCard,
   VotePill,
 } from './components'
-import { useCommunities } from './hooks'
+import { useCommunities, useWorlds } from './hooks'
 import { formatDate, formatDateTime, safe } from './lib'
 import { useAuthStore } from './store/authStore'
 import type {
@@ -38,17 +40,56 @@ import type {
   PromptUpsertRequest,
 } from './types'
 
-function useCommunityScaffold(activeSlug?: string) {
+function useCommunityScaffold(activeSlug?: string, activeWorldSlug?: string) {
   const { communities, loading, error } = useCommunities()
-  const activeCommunity = communities.find((community) => community.slug === activeSlug) ?? null
+  const { worlds, loading: worldsLoading, error: worldsError } = useWorlds()
+  const activeWorld = worlds.find((world) => world.slug === activeWorldSlug) ?? null
+  const visibleCommunities = useMemo(
+    () => (activeWorld ? communities.filter((community) => community.world?.id === activeWorld.id) : communities),
+    [activeWorld, communities],
+  )
+  const activeCommunity = visibleCommunities.find((community) => community.slug === activeSlug) ?? null
   const [characters, setCharacters] = useState<CharacterListItem[]>([])
 
   useEffect(() => {
-    if (!activeCommunity) return
-    void characterApi.list(activeCommunity.id).then(setCharacters).catch(() => setCharacters([]))
-  }, [activeCommunity])
+    let cancelled = false
 
-  return { communities, activeCommunity, characters, loading, error }
+    const loadCharacters = async () => {
+      try {
+        if (activeCommunity) {
+          const items = await characterApi.list(activeCommunity.id)
+          if (!cancelled) {
+            setCharacters(items)
+          }
+          return
+        }
+
+        const lists = await Promise.all(visibleCommunities.map((community) => safe(characterApi.list(community.id))))
+        if (!cancelled) {
+          setCharacters(lists.flatMap((list) => list ?? []))
+        }
+      } catch {
+        if (!cancelled) {
+          setCharacters([])
+        }
+      }
+    }
+
+    if (!visibleCommunities.length) {
+      setCharacters([])
+      return () => {
+        cancelled = true
+      }
+    }
+
+    void loadCharacters()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeCommunity, visibleCommunities])
+
+  return { worlds, communities: visibleCommunities, activeWorld, activeCommunity, characters, loading: loading || worldsLoading, error: error || worldsError }
 }
 
 export function LayoutRoute() {
@@ -57,11 +98,37 @@ export function LayoutRoute() {
 
 export function FeedPage() {
   const params = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const characterIdParam = searchParams.get('characterId')
   const [selectedCharacterId, setSelectedCharacterId] = useState<number | null>(null)
-  const { communities, activeCommunity, characters, loading, error } = useCommunityScaffold(params.slug)
+  const activeCommunitySlug = params.communitySlug ?? params.slug
+  const { worlds, communities, activeWorld, activeCommunity, characters, loading, error } = useCommunityScaffold(activeCommunitySlug, params.worldSlug)
   const [posts, setPosts] = useState<PostListItem[]>([])
   const [fetchingPosts, setFetchingPosts] = useState(true)
   const [postError, setPostError] = useState('')
+
+  useEffect(() => {
+    const nextCharacterId = Number(characterIdParam)
+    setSelectedCharacterId(Number.isFinite(nextCharacterId) && nextCharacterId > 0 ? nextCharacterId : null)
+  }, [activeCommunitySlug, params.worldSlug, characterIdParam])
+
+  useEffect(() => {
+    if (selectedCharacterId == null) return
+    if (!characters.some((character) => character.id === selectedCharacterId)) {
+      setSelectedCharacterId(null)
+    }
+  }, [characters, selectedCharacterId])
+
+  function handleCharacterSelect(characterId: number | null) {
+    setSelectedCharacterId(characterId)
+    const nextParams = new URLSearchParams(searchParams)
+    if (characterId == null) {
+      nextParams.delete('characterId')
+    } else {
+      nextParams.set('characterId', String(characterId))
+    }
+    setSearchParams(nextParams)
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -75,8 +142,20 @@ export function FeedPage() {
               sort: 'latest',
               characterId: selectedCharacterId,
             })
-          : await postApi.list({ page: 0, size: 20, sort: 'latest', characterId: selectedCharacterId })
-        setPosts(response.posts)
+          : activeWorld
+            ? await postApi.listByWorld(activeWorld.id, { page: 0, size: 20, sort: 'latest', characterId: selectedCharacterId })
+            : await postApi.list({ page: 0, size: 20, sort: 'latest', characterId: selectedCharacterId })
+        setPosts(
+          response.posts.filter((post) => {
+            if (activeCommunity && post.community.id !== activeCommunity.id) {
+              return false
+            }
+            if (selectedCharacterId != null && post.character.id !== selectedCharacterId) {
+              return false
+            }
+            return true
+          }),
+        )
       } catch (caught) {
         setPostError(caught instanceof Error ? caught.message : '글 목록을 불러오지 못했습니다.')
       } finally {
@@ -84,15 +163,17 @@ export function FeedPage() {
       }
     }
     void load()
-  }, [activeCommunity, selectedCharacterId])
+  }, [activeWorld, activeCommunity, selectedCharacterId])
 
   return (
     <AppFrame
       communities={communities}
+      worlds={worlds}
+      activeWorldSlug={activeWorld?.slug}
       activeSlug={activeCommunity?.slug}
       sidebarCharacters={characters}
       activeCharacterId={selectedCharacterId}
-      onCharacterSelect={setSelectedCharacterId}
+      onCharacterSelect={handleCharacterSelect}
     >
       <div className="feed-page">
         <div className="feed-head">
@@ -142,6 +223,7 @@ export function FeedPage() {
 
 export function PostDetailPage() {
   const params = useParams()
+  const navigate = useNavigate()
   const postId = Number(params.postId)
   const [post, setPost] = useState<PostDetailResponse | null>(null)
   const [comments, setComments] = useState<CommentThread[]>([])
@@ -175,13 +257,19 @@ export function PostDetailPage() {
     setVoteState(response)
   }
 
+  function handleCharacterSelect(characterId: number | null) {
+    if (!post) return
+    const basePath = `/c/${post.community.slug}`
+    navigate(characterId == null ? basePath : `${basePath}?characterId=${characterId}`)
+  }
+
   return (
     <AppFrame
       communities={scaffold.communities}
       activeSlug={post?.community.slug}
       sidebarCharacters={scaffold.characters}
       activeCharacterId={post?.character.id ?? null}
-      onCharacterSelect={() => undefined}
+      onCharacterSelect={handleCharacterSelect}
     >
       <div className="detail-page">
         {postError ? (
@@ -459,6 +547,7 @@ function CharacterFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
 export function CharacterDetailPage() {
   const params = useParams()
+  const navigate = useNavigate()
   const characterId = Number(params.characterId)
   const [character, setCharacter] = useState<Awaited<ReturnType<typeof characterApi.detail>> | null>(null)
   const [posts, setPosts] = useState<PostListItem[]>([])
@@ -484,8 +573,20 @@ export function CharacterDetailPage() {
     })()
   }, [characterId])
 
+  function handleCharacterSelect(nextCharacterId: number | null) {
+    if (!character) return
+    const basePath = `/c/${character.community.slug}`
+    navigate(nextCharacterId == null ? basePath : `${basePath}?characterId=${nextCharacterId}`)
+  }
+
   return (
-    <AppFrame communities={scaffold.communities} activeSlug={character?.community.slug} sidebarCharacters={scaffold.characters}>
+    <AppFrame
+      communities={scaffold.communities}
+      activeSlug={character?.community.slug}
+      sidebarCharacters={scaffold.characters}
+      activeCharacterId={character?.id ?? null}
+      onCharacterSelect={handleCharacterSelect}
+    >
       {error ? (
         <ErrorBlock message={error} />
       ) : !character ? (
@@ -574,10 +675,11 @@ export function CommunityPromptEditPage() {
   return <PromptEditorPage kind="community" mode="edit" />
 }
 
-function PromptListPage({ kind }: { kind: 'character' | 'community' }) {
+function PromptListPage({ kind }: { kind: 'character' | 'community' | 'world' }) {
   const params = useParams()
   const parentId = Number(kind === 'character' ? params.characterId : params.id)
   const communitiesQuery = useCommunities()
+  const worldsQuery = useWorlds()
   const [prompts, setPrompts] = useState<PromptListItem[]>([])
   const [message, setMessage] = useState('')
   const [title, setTitle] = useState('')
@@ -585,7 +687,12 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' }) {
 
   useEffect(() => {
     void (async () => {
-      const list = kind === 'character' ? await characterApi.listPrompts(parentId) : await communityApi.listPrompts(parentId)
+      const list =
+        kind === 'character'
+          ? await characterApi.listPrompts(parentId)
+          : kind === 'world'
+            ? await worldApi.listPrompts(parentId)
+            : await communityApi.listPrompts(parentId)
       setPrompts(list.sort((a, b) => a.sortOrder - b.sortOrder))
     })()
   }, [kind, parentId])
@@ -596,17 +703,23 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' }) {
         const detail = await characterApi.detail(parentId)
         setTitle(`${detail.name}의 프롬프트`)
         setSubtitle(`${detail.community.name} · 활성 ${prompts.filter((item) => item.isActive).length}개`)
+      } else if (kind === 'world') {
+        const world = worldsQuery.worlds.find((item) => item.id === parentId)
+        setTitle(`${world?.name ?? '월드'} 프롬프트`)
+        setSubtitle('세계관 공통 규칙과 톤을 조정합니다.')
       } else {
         const community = communitiesQuery.communities.find((item) => item.id === parentId)
         setTitle(`${community?.name ?? '커뮤니티'} 프롬프트`)
         setSubtitle('세계관 공통 규칙과 톤을 조정합니다.')
       }
     })()
-  }, [communitiesQuery.communities, kind, parentId, prompts])
+  }, [communitiesQuery.communities, worldsQuery.worlds, kind, parentId, prompts])
 
   async function togglePrompt(promptId: number, isActive: boolean) {
     if (kind === 'character') {
       await characterApi.togglePrompt(parentId, promptId, isActive)
+    } else if (kind === 'world') {
+      await worldApi.togglePrompt(parentId, promptId, isActive)
     } else {
       await communityApi.togglePrompt(parentId, promptId, isActive)
     }
@@ -623,10 +736,25 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' }) {
     const promptOrders = normalized.map((item) => ({ id: item.id, sortOrder: item.sortOrder }))
     if (kind === 'character') {
       await characterApi.sortPrompts(parentId, promptOrders)
+    } else if (kind === 'world') {
+      await worldApi.sortPrompts(parentId, promptOrders)
     } else {
       await communityApi.sortPrompts(parentId, promptOrders)
     }
     setMessage('프롬프트 순서를 저장했습니다.')
+  }
+
+  async function removePrompt(promptId: number) {
+    if (!window.confirm('이 프롬프트를 삭제하시겠습니까?')) return
+    if (kind === 'character') {
+      await characterApi.deletePrompt(parentId, promptId)
+    } else if (kind === 'world') {
+      await worldApi.deletePrompt(parentId, promptId)
+    } else {
+      await communityApi.deletePrompt(parentId, promptId)
+    }
+    setPrompts((current) => current.filter((item) => item.id !== promptId))
+    setMessage('프롬프트를 삭제했습니다.')
   }
 
   return (
@@ -639,7 +767,7 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' }) {
           </div>
           <Link
             className="primary-btn"
-            to={kind === 'character' ? `/characters/${parentId}/prompts/new` : `/admin/communities/${parentId}/prompts/new`}
+            to={kind === 'character' ? `/characters/${parentId}/prompts/new` : kind === 'world' ? `/admin/worlds/${parentId}/prompts/new` : `/admin/communities/${parentId}/prompts/new`}
           >
             새 프롬프트
           </Link>
@@ -673,12 +801,17 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' }) {
                     <button className="gnb-btn" onClick={() => void togglePrompt(prompt.id, !prompt.isActive)}>
                       {prompt.isActive ? '비활성화' : '활성화'}
                     </button>
+                    <button className="gnb-btn" onClick={() => void removePrompt(prompt.id)}>
+                      삭제
+                    </button>
                     <Link
                       className="gnb-btn primary"
                       to={
                         kind === 'character'
                           ? `/characters/${parentId}/prompts/${prompt.id}/edit`
-                          : `/admin/communities/${parentId}/prompts/${prompt.id}/edit`
+                          : kind === 'world'
+                            ? `/admin/worlds/${parentId}/prompts/${prompt.id}/edit`
+                            : `/admin/communities/${parentId}/prompts/${prompt.id}/edit`
                       }
                     >
                       수정
@@ -694,7 +827,7 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' }) {
   )
 }
 
-function PromptEditorPage({ kind, mode }: { kind: 'character' | 'community'; mode: 'create' | 'edit' }) {
+function PromptEditorPage({ kind, mode }: { kind: 'character' | 'community' | 'world'; mode: 'create' | 'edit' }) {
   const params = useParams()
   const navigate = useNavigate()
   const communitiesQuery = useCommunities()
@@ -714,7 +847,9 @@ function PromptEditorPage({ kind, mode }: { kind: 'character' | 'community'; mod
       const detail =
         kind === 'character'
           ? await characterApi.getPrompt(parentId, promptId)
-          : await communityApi.getPrompt(parentId, promptId)
+          : kind === 'world'
+            ? await worldApi.getPrompt(parentId, promptId)
+            : await communityApi.getPrompt(parentId, promptId)
       setForm({
         title: detail.title,
         content: detail.content,
@@ -730,6 +865,9 @@ function PromptEditorPage({ kind, mode }: { kind: 'character' | 'community'; mod
       if (kind === 'character') {
         await characterApi.createPrompt(parentId, form)
         navigate(`/characters/${parentId}/prompts`)
+      } else if (kind === 'world') {
+        await worldApi.createPrompt(parentId, form)
+        navigate(`/admin/worlds/${parentId}/prompts`)
       } else {
         await communityApi.createPrompt(parentId, form)
         navigate(`/admin/communities/${parentId}/prompts`)
@@ -738,6 +876,8 @@ function PromptEditorPage({ kind, mode }: { kind: 'character' | 'community'; mod
     }
     if (kind === 'character') {
       await characterApi.updatePrompt(parentId, promptId, form)
+    } else if (kind === 'world') {
+      await worldApi.updatePrompt(parentId, promptId, form)
     } else {
       await communityApi.updatePrompt(parentId, promptId, form)
     }
@@ -806,10 +946,10 @@ function PromptFrame({
   children,
 }: {
   communities: CommunityListItem[]
-  kind: 'character' | 'community'
+  kind: 'character' | 'community' | 'world'
   children: ReactNode
 }) {
-  if (kind === 'community') {
+  if (kind === 'community' || kind === 'world') {
     return <AdminFrame>{children}</AdminFrame>
   }
   return <AppFrame communities={communities}>{children}</AppFrame>
@@ -882,12 +1022,229 @@ export function CommunityEditPage() {
   return <CommunityFormPage mode="edit" />
 }
 
+export function WorldCreatePage() {
+  return <WorldFormPage mode="create" />
+}
+
+export function WorldEditPage() {
+  return <WorldFormPage mode="edit" />
+}
+
+export function WorldPromptPage() {
+  return <PromptListPage kind="world" />
+}
+
+export function WorldPromptCreatePage() {
+  return <PromptEditorPage kind="world" mode="create" />
+}
+
+export function WorldPromptEditPage() {
+  return <PromptEditorPage kind="world" mode="edit" />
+}
+
+export function AdminWorldPage() {
+  const worldsQuery = useWorlds()
+  const [worlds, setWorlds] = useState(worldsQuery.worlds)
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    setWorlds(worldsQuery.worlds)
+  }, [worldsQuery.worlds])
+
+  async function removeWorld(worldId: number) {
+    if (!window.confirm('이 월드를 삭제하시겠습니까?')) return
+    await worldApi.remove(worldId)
+    setWorlds((current) => current.filter((world) => world.id !== worldId))
+    setMessage('월드를 삭제했습니다.')
+  }
+
+  return (
+    <AdminFrame>
+      <div className="stack">
+        <div className="feed-head">
+          <div>
+            <h1 className="page-title">월드 관리</h1>
+            <p className="page-subtitle">커뮤니티의 상위 세계관을 관리합니다.</p>
+          </div>
+          <Link className="primary-btn" to="/admin/worlds/new">
+            새 월드
+          </Link>
+        </div>
+        {message ? <div className="success-block">{message}</div> : null}
+        {worldsQuery.error ? <ErrorBlock message={worldsQuery.error} /> : null}
+        <SectionCard title={`월드 ${worlds.length}`}>
+          {!worlds.length && !worldsQuery.loading ? (
+            <EmptyState title="등록된 월드가 없습니다" description="새 월드를 생성한 뒤 커뮤니티를 연결하세요." />
+          ) : (
+            <div className="list">
+              {worlds.map((world) => (
+                <div className="list-row stacked" key={world.id}>
+                  <div className="row-top">
+                    <div>
+                      <div className="row-title serif">{world.name}</div>
+                      <MetaLine items={[world.slug, `커뮤니티 ${world.communityCount}`]} />
+                    </div>
+                    <div className="row-side">
+                      <Link className="gnb-btn" to={`/admin/worlds/${world.id}/prompts`}>
+                        프롬프트
+                      </Link>
+                      <Link className="gnb-btn" to={`/admin/worlds/${world.id}/edit`}>
+                        수정
+                      </Link>
+                      <button className="gnb-btn" onClick={() => void removeWorld(world.id)}>
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                  <div className="post-preview">{world.description}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      </div>
+    </AdminFrame>
+  )
+}
+
+function WorldFormPage({ mode }: { mode: 'create' | 'edit' }) {
+  const worldsQuery = useWorlds()
+  const params = useParams()
+  const navigate = useNavigate()
+  const worldId = Number(params.id)
+  const [form, setForm] = useState({ name: '', slug: '', description: '', thumbnailUrl: '' })
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    if (mode !== 'edit') return
+    const world = worldsQuery.worlds.find((item) => item.id === worldId)
+    if (!world) return
+    setForm({
+      name: world.name,
+      slug: world.slug,
+      description: world.description ?? '',
+      thumbnailUrl: world.thumbnailUrl ?? '',
+    })
+  }, [mode, worldId, worldsQuery.worlds])
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (mode === 'create') {
+      const response = await worldApi.create(form)
+      navigate(`/admin/worlds/${response.id}/edit`)
+      return
+    }
+    await worldApi.update(worldId, form)
+    setMessage('월드 정보를 저장했습니다.')
+  }
+
+  return (
+    <AdminFrame>
+      <SectionCard title={mode === 'create' ? '월드 생성' : '월드 수정'}>
+        <form className="stack form-stack" onSubmit={onSubmit}>
+          <label className="field">
+            <span className="field-label">이름</span>
+            <input className="field-input" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required />
+          </label>
+          <label className="field">
+            <span className="field-label">슬러그</span>
+            <input className="field-input" value={form.slug} disabled={mode === 'edit'} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} required />
+          </label>
+          <label className="field">
+            <span className="field-label">설명</span>
+            <textarea className="field-input field-textarea short" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
+          </label>
+          <label className="field">
+            <span className="field-label">썸네일 URL</span>
+            <input className="field-input" value={form.thumbnailUrl} onChange={(event) => setForm((current) => ({ ...current, thumbnailUrl: event.target.value }))} />
+          </label>
+          {mode === 'edit' && (
+            <Link className="gnb-btn" to={`/admin/worlds/${worldId}/prompts`}>
+              프롬프트 관리로 이동
+            </Link>
+          )}
+          {message ? <div className="success-block">{message}</div> : null}
+          <button className="primary-btn" type="submit">
+            {mode === 'create' ? '생성' : '저장'}
+          </button>
+        </form>
+      </SectionCard>
+    </AdminFrame>
+  )
+}
+
+export function AdminCommunityPage() {
+  const communitiesQuery = useCommunities()
+  const [communities, setCommunities] = useState<CommunityListItem[]>([])
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    setCommunities(communitiesQuery.communities)
+  }, [communitiesQuery.communities])
+
+  async function removeCommunity(communityId: number) {
+    if (!window.confirm('이 커뮤니티를 삭제하시겠습니까?')) return
+    await communityApi.remove(communityId)
+    setCommunities((current) => current.filter((community) => community.id !== communityId))
+    setMessage('커뮤니티를 삭제했습니다.')
+  }
+
+  return (
+    <AdminFrame>
+      <div className="stack">
+        <div className="feed-head">
+          <div>
+            <h1 className="page-title">커뮤니티 관리</h1>
+            <p className="page-subtitle">커뮤니티 정보를 수정하고 프롬프트를 관리합니다.</p>
+          </div>
+          <Link className="primary-btn" to="/admin/communities/new">
+            새 커뮤니티
+          </Link>
+        </div>
+        {message ? <div className="success-block">{message}</div> : null}
+        {communitiesQuery.error ? <ErrorBlock message={communitiesQuery.error} /> : null}
+        <SectionCard title={`커뮤니티 ${communities.length}`}>
+          {!communities.length && !communitiesQuery.loading ? (
+            <EmptyState title="등록된 커뮤니티가 없습니다" description="새 커뮤니티를 생성해 운영을 시작하세요." />
+          ) : (
+            <div className="list">
+              {communities.map((community) => (
+                <div className="list-row stacked" key={community.id}>
+                  <div className="row-top">
+                    <div>
+                      <div className="row-title serif">{community.name}</div>
+                      <MetaLine items={[community.slug, `캐릭터 ${community.characterCount}`, `글 ${community.postCount}`]} />
+                    </div>
+                    <div className="row-side">
+                      <Link className="gnb-btn" to={`/admin/communities/${community.id}/prompts`}>
+                        프롬프트
+                      </Link>
+                      <Link className="gnb-btn" to={`/admin/communities/${community.id}/edit`}>
+                        수정
+                      </Link>
+                      <button className="gnb-btn" onClick={() => void removeCommunity(community.id)}>
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                  <div className="post-preview">{community.description}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      </div>
+    </AdminFrame>
+  )
+}
+
 function CommunityFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const communitiesQuery = useCommunities()
+  const worldsQuery = useWorlds()
   const params = useParams()
   const navigate = useNavigate()
   const communityId = Number(params.id)
-  const [form, setForm] = useState({ name: '', slug: '', description: '', thumbnailUrl: '' })
+  const [form, setForm] = useState<{ worldId: number | null; name: string; slug: string; description: string; thumbnailUrl: string }>({ worldId: null, name: '', slug: '', description: '', thumbnailUrl: '' })
   const [message, setMessage] = useState('')
 
   useEffect(() => {
@@ -896,6 +1253,7 @@ function CommunityFormPage({ mode }: { mode: 'create' | 'edit' }) {
       const community = communitiesQuery.communities.find((item) => item.id === communityId)
       if (!community) return
       setForm({
+        worldId: community.world?.id ?? null,
         name: community.name,
         slug: community.slug,
         description: community.description ?? '',
@@ -919,6 +1277,21 @@ function CommunityFormPage({ mode }: { mode: 'create' | 'edit' }) {
     <AdminFrame>
       <SectionCard title={mode === 'create' ? '커뮤니티 생성' : '커뮤니티 수정'}>
         <form className="stack form-stack" onSubmit={onSubmit}>
+          <label className="field">
+            <span className="field-label">월드</span>
+            <select
+              className="field-input"
+              value={form.worldId ?? ''}
+              onChange={(event) => setForm((current) => ({ ...current, worldId: event.target.value ? Number(event.target.value) : null }))}
+            >
+              <option value="">월드 없음</option>
+              {worldsQuery.worlds.map((world) => (
+                <option key={world.id} value={world.id}>
+                  {world.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="field">
             <span className="field-label">이름</span>
             <input className="field-input" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required />

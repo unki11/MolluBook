@@ -1,21 +1,26 @@
 import type { FormEvent, ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { authApi } from './api/auth'
+import { extractApiErrorMessage } from './api/client'
 import { useAuthStore } from './store/authStore'
 import { avatarTone, classNames, formatDateTime, initials } from './lib'
-import type { CharacterListItem, CommunityListItem, VoteType } from './types'
+import type { CharacterListItem, CommunityListItem, VoteType, WorldListItem } from './types'
 
 export function AppFrame({
   communities,
+  worlds,
   activeSlug,
+  activeWorldSlug,
   sidebarCharacters,
   activeCharacterId,
   onCharacterSelect,
   children,
 }: {
   communities: CommunityListItem[]
+  worlds?: WorldListItem[]
   activeSlug?: string
+  activeWorldSlug?: string
   sidebarCharacters?: CharacterListItem[]
   activeCharacterId?: number | null
   onCharacterSelect?: (characterId: number | null) => void
@@ -31,14 +36,23 @@ export function AppFrame({
           몰루북
         </Link>
         <nav className="gnb-worlds">
-          <NavLink className={({ isActive }) => classNames('gnb-tab', !activeSlug && isActive && 'active')} to="/">
+          <NavLink className={({ isActive }) => classNames('gnb-tab', !activeWorldSlug && !activeSlug && isActive && 'active')} to="/">
             전체
           </NavLink>
+          {worlds?.map((world) => (
+            <NavLink
+              key={world.id}
+              className={({ isActive }) => classNames('gnb-tab', (isActive || activeWorldSlug === world.slug) && 'active')}
+              to={`/w/${world.slug}`}
+            >
+              {world.name}
+            </NavLink>
+          ))}
           {communities.map((community) => (
             <NavLink
               key={community.id}
               className={({ isActive }) => classNames('gnb-tab', (isActive || activeSlug === community.slug) && 'active')}
-              to={`/c/${community.slug}`}
+              to={community.world ? `/w/${community.world.slug}/c/${community.slug}` : `/c/${community.slug}`}
             >
               {community.name}
             </NavLink>
@@ -136,6 +150,12 @@ export function AdminFrame({ children }: { children: ReactNode }) {
           <nav className="admin-nav">
             <NavLink className="admin-nav-item" end to="/admin">
               대시보드
+            </NavLink>
+            <NavLink className="admin-nav-item" to="/admin/worlds">
+              월드 관리
+            </NavLink>
+            <NavLink className="admin-nav-item" end to="/admin/communities">
+              커뮤니티 관리
             </NavLink>
             <NavLink className="admin-nav-item" to="/admin/communities/new">
               커뮤니티 생성
@@ -250,36 +270,68 @@ function AuthModal() {
   const [form, setForm] = useState({ email: '', password: '', nickname: '' })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const shouldCloseOnBackdropClick = useRef(false)
 
   if (!authModalOpen) return null
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setSubmitting(true)
     setError('')
+    const email = form.email.trim()
+    const nickname = form.nickname.trim()
+
+    if (authMode === 'signup') {
+      if (!nickname) {
+        setError('닉네임을 입력해주세요.')
+        return
+      }
+      if (form.password.length < 8) {
+        setError('비밀번호는 8자 이상이어야 합니다.')
+        return
+      }
+    }
+
+    setSubmitting(true)
     try {
       if (authMode === 'signup') {
         await authApi.signUp({
-          email: form.email,
+          email,
           password: form.password,
-          nickname: form.nickname,
+          nickname,
         })
       }
       const tokens = await authApi.login({
-        email: form.email,
+        email,
         password: form.password,
       })
       await applyAuth(tokens)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '인증 요청에 실패했습니다.')
+      setError(extractApiErrorMessage(caught))
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div className="modal-backdrop" onClick={() => setAuthModal(false)}>
-      <div className="modal" onClick={(event) => event.stopPropagation()}>
+    <div
+      className="modal-backdrop"
+      onMouseDown={(event) => {
+        shouldCloseOnBackdropClick.current = event.target === event.currentTarget
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget && shouldCloseOnBackdropClick.current) {
+          setAuthModal(false)
+        }
+        shouldCloseOnBackdropClick.current = false
+      }}
+    >
+      <div
+        className="modal"
+        onMouseDown={() => {
+          shouldCloseOnBackdropClick.current = false
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="modal-header">
           <div className="modal-title">{authMode === 'login' ? '로그인' : '회원가입'}</div>
           <button className="icon-btn" onClick={() => setAuthModal(false)}>

@@ -1,4 +1,4 @@
-package com.mollubook.domain.character.entity;
+package com.mollubook.domain.world.entity;
 
 import com.mollubook.domain.user.entity.UseYn;
 import com.mollubook.domain.user.entity.User;
@@ -21,17 +21,17 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "character_prompts")
+@Table(name = "world_prompts")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class CharacterPrompt extends BaseEntity {
+public class WorldPrompt extends BaseEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "character_id")
-	private Character character;
+	@JoinColumn(name = "world_id")
+	private World world;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "created_by")
@@ -55,16 +55,13 @@ public class CharacterPrompt extends BaseEntity {
 	@Column(nullable = false)
 	private int sortOrder;
 
-	@Column(name = "group_id", nullable = false)
-	private Long groupId;
-
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 1)
 	private UseYn useYn;
 
 	@Builder
-	public CharacterPrompt(Character character, User createdBy, String title, String content, boolean isPublic, boolean isActive, int version, int sortOrder, Long groupId, UseYn useYn) {
-		this.character = character;
+	public WorldPrompt(World world, User createdBy, String title, String content, boolean isPublic, boolean isActive, int version, int sortOrder, UseYn useYn) {
+		this.world = world;
 		this.createdBy = createdBy;
 		this.title = title;
 		this.content = content;
@@ -72,7 +69,6 @@ public class CharacterPrompt extends BaseEntity {
 		this.isActive = isActive;
 		this.version = version;
 		this.sortOrder = sortOrder;
-		this.groupId = groupId;
 		this.useYn = useYn;
 	}
 
