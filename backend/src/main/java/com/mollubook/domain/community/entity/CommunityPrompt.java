@@ -55,12 +55,15 @@ public class CommunityPrompt extends BaseEntity {
 	@Column(nullable = false)
 	private int sortOrder;
 
+	@Column(name = "group_id", nullable = false)
+	private Long groupId;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 1)
 	private UseYn useYn;
 
 	@Builder
-	public CommunityPrompt(Community community, User createdBy, String title, String content, boolean isPublic, boolean isActive, int version, int sortOrder, UseYn useYn) {
+	public CommunityPrompt(Community community, User createdBy, String title, String content, boolean isPublic, boolean isActive, int version, int sortOrder, Long groupId, UseYn useYn) {
 		this.community = community;
 		this.createdBy = createdBy;
 		this.title = title;
@@ -69,6 +72,7 @@ public class CommunityPrompt extends BaseEntity {
 		this.isActive = isActive;
 		this.version = version;
 		this.sortOrder = sortOrder;
+		this.groupId = groupId;
 		this.useYn = useYn;
 	}
 

@@ -18,6 +18,8 @@ import com.mollubook.domain.user.entity.SystemRole;
 import com.mollubook.domain.user.entity.UseYn;
 import com.mollubook.domain.user.entity.User;
 import com.mollubook.domain.user.repository.UserRepository;
+import com.mollubook.domain.world.entity.World;
+import com.mollubook.domain.world.repository.WorldRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -33,8 +35,9 @@ public class DataInitializer {
 	private final PostRepository postRepository;
 	private final CommentRepository commentRepository;
 	private final PasswordEncoder passwordEncoder;
+	private final WorldRepository worldRepository;
 
-	public DataInitializer(UserRepository userRepository, CommunityRepository communityRepository, CommunityManagerRepository communityManagerRepository, CommunityPromptRepository communityPromptRepository, CharacterRepository characterRepository, PostRepository postRepository, CommentRepository commentRepository, PasswordEncoder passwordEncoder) {
+	public DataInitializer(UserRepository userRepository, CommunityRepository communityRepository, CommunityManagerRepository communityManagerRepository, CommunityPromptRepository communityPromptRepository, CharacterRepository characterRepository, PostRepository postRepository, CommentRepository commentRepository, PasswordEncoder passwordEncoder, WorldRepository worldRepository) {
 		this.userRepository = userRepository;
 		this.communityRepository = communityRepository;
 		this.communityManagerRepository = communityManagerRepository;
@@ -43,6 +46,7 @@ public class DataInitializer {
 		this.postRepository = postRepository;
 		this.commentRepository = commentRepository;
 		this.passwordEncoder = passwordEncoder;
+		this.worldRepository = worldRepository;
 	}
 
 	@PostConstruct
@@ -67,7 +71,16 @@ public class DataInitializer {
 			.useYn(UseYn.Y)
 			.build());
 
+		World world = worldRepository.save(World.builder()
+			.name("기본 세계관")
+			.slug("default-world")
+			.description("초기 샘플 세계관")
+			.thumbnailUrl("https://example.com/default-world.png")
+			.isPrivate(false)
+			.build());
+
 		Community community = communityRepository.save(Community.builder()
+			.world(world)
 			.name("중세 마법학원")
 			.slug("magic-academy")
 			.description("마법학원 세계관 샘플 커뮤니티")
@@ -90,6 +103,7 @@ public class DataInitializer {
 			.isActive(true)
 			.version(1)
 			.sortOrder(1)
+			.groupId(1L)
 			.useYn(UseYn.Y)
 			.build());
 

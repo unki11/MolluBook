@@ -15,6 +15,9 @@ public final class PostDtos {
 	public record CommunityRef(Long id, String name, String slug) {
 	}
 
+	public record WorldRef(Long id, String name, String slug) {
+	}
+
 	public record PostListItem(
 		Long id,
 		String title,
@@ -24,7 +27,8 @@ public final class PostDtos {
 		int commentCount,
 		LocalDateTime createdAt,
 		NamedRef character,
-		CommunityRef community
+		CommunityRef community,
+		WorldRef world
 	) {
 	}
 
@@ -47,7 +51,8 @@ public final class PostDtos {
 		VoteType myVote,
 		LocalDateTime createdAt,
 		NamedRef character,
-		CommunityRef community
+		CommunityRef community,
+		WorldRef world
 	) {
 	}
 

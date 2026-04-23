@@ -15,6 +15,7 @@ import com.mollubook.domain.community.dto.CommunityDtos.PromptOrderRequest;
 import com.mollubook.domain.community.dto.CommunityDtos.PromptUpsertRequest;
 import com.mollubook.domain.community.dto.CommunityDtos.UpdateCommunityRequest;
 import com.mollubook.domain.community.dto.CommunityDtos.VersionedIdResponse;
+import com.mollubook.domain.community.dto.CommunityDtos.WorldSummary;
 import com.mollubook.domain.community.entity.Community;
 import com.mollubook.domain.community.entity.CommunityManager;
 import com.mollubook.domain.community.entity.CommunityPrompt;
@@ -28,11 +29,14 @@ import com.mollubook.domain.user.entity.SystemRole;
 import com.mollubook.domain.user.entity.UseYn;
 import com.mollubook.domain.user.entity.User;
 import com.mollubook.domain.user.repository.UserRepository;
+import com.mollubook.domain.world.entity.World;
+import com.mollubook.domain.world.repository.WorldRepository;
 import com.mollubook.global.exception.CustomException;
 import com.mollubook.global.exception.ErrorCode;
 import com.mollubook.global.security.SecurityUtils;
 import jakarta.transaction.Transactional;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -45,27 +49,27 @@ public class CommunityService {
 	private final CharacterRepository characterRepository;
 	private final PostRepository postRepository;
 	private final UserRepository userRepository;
+	private final WorldRepository worldRepository;
 
-	public CommunityService(CommunityRepository communityRepository, CommunityManagerRepository communityManagerRepository, CommunityPromptRepository communityPromptRepository, CharacterRepository characterRepository, PostRepository postRepository, UserRepository userRepository) {
+	public CommunityService(CommunityRepository communityRepository, CommunityManagerRepository communityManagerRepository, CommunityPromptRepository communityPromptRepository, CharacterRepository characterRepository, PostRepository postRepository, UserRepository userRepository, WorldRepository worldRepository) {
 		this.communityRepository = communityRepository;
 		this.communityManagerRepository = communityManagerRepository;
 		this.communityPromptRepository = communityPromptRepository;
 		this.characterRepository = characterRepository;
 		this.postRepository = postRepository;
 		this.userRepository = userRepository;
+		this.worldRepository = worldRepository;
 	}
 
 	public List<CommunityListItem> getCommunities() {
 		return communityRepository.findAll().stream()
-			.map(community -> new CommunityListItem(
-				community.getId(),
-				community.getName(),
-				community.getSlug(),
-				community.getDescription(),
-				community.getThumbnailUrl(),
-				characterRepository.findByCommunityIdOrderByLastPostAtDesc(community.getId()).size(),
-				postRepository.countByCommunityId(community.getId())
-			))
+			.map(this::toListItem)
+			.toList();
+	}
+
+	public List<CommunityListItem> getCommunities(Long worldId) {
+		return communityRepository.findByWorldIdOrderByNameAsc(worldId).stream()
+			.map(this::toListItem)
 			.toList();
 	}
 
@@ -75,13 +79,15 @@ public class CommunityService {
 		List<CharacterSummary> characters = characterRepository.findByCommunityIdOrderByLastPostAtDesc(community.getId()).stream()
 			.map(character -> new CharacterSummary(character.getId(), character.getName(), character.getPostCount(), character.getStatus().name(), character.getLastPostAt()))
 			.toList();
-		return new CommunityDetailResponse(community.getId(), community.getName(), community.getSlug(), community.getDescription(), community.getThumbnailUrl(), characters);
+		return new CommunityDetailResponse(community.getId(), community.getName(), community.getSlug(), community.getDescription(), community.getThumbnailUrl(), toWorldSummary(community.getWorld()), characters);
 	}
 
 	public IdResponse createCommunity(CreateCommunityRequest request) {
 		User user = currentUser();
 		requireAdmin(user);
+		World world = request.worldId() == null ? null : getWorldEntity(request.worldId());
 		Community community = communityRepository.save(Community.builder()
+			.world(world)
 			.name(request.name())
 			.slug(request.slug())
 			.description(request.description())
@@ -100,6 +106,7 @@ public class CommunityService {
 		requireAdmin(currentUser());
 		Community community = getCommunityEntity(communityId);
 		community.update(request.name(), request.description(), request.thumbnailUrl());
+		community.updateWorld(request.worldId() == null ? null : getWorldEntity(request.worldId()));
 		return new IdResponse(community.getId());
 	}
 
@@ -146,6 +153,7 @@ public class CommunityService {
 			.isActive(false)
 			.version(1)
 			.sortOrder(request.sortOrder() == null ? 1 : request.sortOrder())
+			.groupId(newPromptGroupId())
 			.useYn(UseYn.Y)
 			.build());
 		return new IdResponse(prompt.getId());
@@ -207,5 +215,31 @@ public class CommunityService {
 		if (user.getSystemRole() != SystemRole.ADMIN) {
 			throw new CustomException(ErrorCode.COMMON_001);
 		}
+	}
+
+	private World getWorldEntity(Long worldId) {
+		return worldRepository.findById(worldId)
+			.orElseThrow(() -> new CustomException(ErrorCode.WORLD_001));
+	}
+
+	private CommunityListItem toListItem(Community community) {
+		return new CommunityListItem(
+			community.getId(),
+			community.getName(),
+			community.getSlug(),
+			community.getDescription(),
+			community.getThumbnailUrl(),
+			toWorldSummary(community.getWorld()),
+			characterRepository.findByCommunityIdOrderByLastPostAtDesc(community.getId()).size(),
+			postRepository.countByCommunityId(community.getId())
+		);
+	}
+
+	private WorldSummary toWorldSummary(World world) {
+		return world == null ? null : new WorldSummary(world.getId(), world.getName(), world.getSlug());
+	}
+
+	private long newPromptGroupId() {
+		return ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE);
 	}
 }

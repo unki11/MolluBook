@@ -26,6 +26,9 @@ public final class CharacterDtos {
 	public record CommunitySummary(Long id, String name, String slug) {
 	}
 
+	public record WorldSummary(Long id, String name, String slug) {
+	}
+
 	public record CharacterListItem(
 		Long id,
 		String name,
@@ -43,6 +46,7 @@ public final class CharacterDtos {
 		String status,
 		LocalDateTime lastPostAt,
 		CommunitySummary community,
+		WorldSummary world,
 		OwnerSummary owner
 	) {
 	}

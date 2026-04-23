@@ -10,8 +10,10 @@ import com.mollubook.global.exception.CustomException;
 import com.mollubook.global.security.SecurityUtils;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional
 public class CommentService {
 
 	private final CommentRepository commentRepository;
@@ -22,6 +24,7 @@ public class CommentService {
 		this.voteService = voteService;
 	}
 
+	@Transactional(readOnly = true)
 	public List<CommentThread> getComments(Long postId) {
 		List<Comment> comments = commentRepository.findByPostIdOrderByCreatedAtAsc(postId);
 		Long userId = null;

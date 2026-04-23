@@ -7,6 +7,7 @@ import com.mollubook.domain.character.dto.CharacterDtos.CharacterStatusRequest;
 import com.mollubook.domain.character.dto.CharacterDtos.CharacterUpdateRequest;
 import com.mollubook.domain.character.dto.CharacterDtos.CommunitySummary;
 import com.mollubook.domain.character.dto.CharacterDtos.OwnerSummary;
+import com.mollubook.domain.character.dto.CharacterDtos.WorldSummary;
 import com.mollubook.domain.character.dto.CharacterDtos.PromptActiveRequest;
 import com.mollubook.domain.character.dto.CharacterDtos.PromptOrderItem;
 import com.mollubook.domain.character.dto.CharacterDtos.PromptOrderRequest;
@@ -32,6 +33,7 @@ import com.mollubook.global.exception.ErrorCode;
 import com.mollubook.global.security.SecurityUtils;
 import jakarta.transaction.Transactional;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -65,6 +67,7 @@ public class CharacterService {
 			character.getStatus().name(),
 			character.getLastPostAt(),
 			new CommunitySummary(character.getCommunity().getId(), character.getCommunity().getName(), character.getCommunity().getSlug()),
+			character.getCommunity().getWorld() == null ? null : new WorldSummary(character.getCommunity().getWorld().getId(), character.getCommunity().getWorld().getName(), character.getCommunity().getWorld().getSlug()),
 			new OwnerSummary(character.getUser().getId(), character.getUser().getNickname())
 		);
 	}
@@ -140,6 +143,7 @@ public class CharacterService {
 			.isActive(false)
 			.version(1)
 			.sortOrder(request.sortOrder() == null ? 1 : request.sortOrder())
+			.groupId(newPromptGroupId())
 			.useYn(UseYn.Y)
 			.build());
 		return new IdResponse(prompt.getId());
@@ -221,5 +225,9 @@ public class CharacterService {
 		if (currentUser().getSystemRole() != SystemRole.ADMIN) {
 			throw new CustomException(ErrorCode.COMMON_001);
 		}
+	}
+
+	private long newPromptGroupId() {
+		return ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE);
 	}
 }
