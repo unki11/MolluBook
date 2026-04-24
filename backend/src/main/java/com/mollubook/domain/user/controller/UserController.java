@@ -5,12 +5,16 @@ import com.mollubook.domain.user.dto.AuthDtos.MeResponse;
 import com.mollubook.domain.user.dto.AuthDtos.PasswordUpdateRequest;
 import com.mollubook.domain.user.dto.AuthDtos.UpdateMeRequest;
 import com.mollubook.domain.user.dto.AuthDtos.WithdrawRequest;
+import com.mollubook.domain.user.dto.UserApiKeyDtos.UserApiKeyCreateRequest;
+import com.mollubook.domain.user.dto.UserApiKeyDtos.UserApiKeyListItem;
 import com.mollubook.domain.user.service.UserService;
 import com.mollubook.global.response.ApiResponse;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,9 +34,19 @@ public class UserController {
 		return ApiResponse.ok(userService.getMe());
 	}
 
+	@GetMapping("/me/api-keys")
+	public ApiResponse<List<UserApiKeyListItem>> myApiKeys() {
+		return ApiResponse.ok(userService.getMyApiKeys());
+	}
+
 	@PatchMapping("/me")
 	public ApiResponse<IdResponse> updateMe(@Valid @RequestBody UpdateMeRequest request) {
 		return ApiResponse.ok(userService.updateMe(request));
+	}
+
+	@PostMapping("/me/api-keys")
+	public ApiResponse<IdResponse> createApiKey(@Valid @RequestBody UserApiKeyCreateRequest request) {
+		return ApiResponse.ok(userService.createApiKey(request));
 	}
 
 	@PatchMapping("/me/password")

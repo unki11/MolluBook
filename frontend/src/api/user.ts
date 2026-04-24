@@ -1,8 +1,11 @@
 import { api, unwrap } from './client'
-import type { IdResponse, MeResponse } from '../types'
+import type { AiModel, IdResponse, MeResponse, UserApiKeyListItem } from '../types'
 
 export const userApi = {
   me: () => unwrap<MeResponse>(api.get('/api/users/me')),
+  listApiKeys: () => unwrap<UserApiKeyListItem[]>(api.get('/api/users/me/api-keys')),
+  createApiKey: (payload: { label: string; apiKey: string; aiModel: AiModel }) =>
+    unwrap<IdResponse>(api.post('/api/users/me/api-keys', payload)),
   updateMe: (payload: { nickname: string }) => unwrap<IdResponse>(api.patch('/api/users/me', payload)),
   updatePassword: (payload: { currentPassword?: string; newPassword: string }) =>
     unwrap<void>(api.patch('/api/users/me/password', payload)),

@@ -6,6 +6,7 @@ import com.mollubook.domain.character.dto.CharacterDtos.CharacterListItem;
 import com.mollubook.domain.character.dto.CharacterDtos.CharacterStatusRequest;
 import com.mollubook.domain.character.dto.CharacterDtos.CharacterUpdateRequest;
 import com.mollubook.domain.character.dto.CharacterDtos.GenerateRequest;
+import com.mollubook.domain.character.dto.CharacterDtos.GenerateContextResponse;
 import com.mollubook.domain.character.dto.CharacterDtos.PromptActiveRequest;
 import com.mollubook.domain.character.dto.CharacterDtos.PromptOrderRequest;
 import com.mollubook.domain.character.dto.CharacterDtos.PromptUpsertRequest;
@@ -118,5 +119,15 @@ public class CharacterController {
 	@PostMapping("/api/characters/{characterId}/generate")
 	public ApiResponse<IdResponse> generate(@PathVariable Long characterId, @RequestBody(required = false) GenerateRequest request) {
 		return ApiResponse.ok(generateService.generate(characterId, request == null ? null : request.topic()));
+	}
+
+	@GetMapping("/api/characters/{characterId}/generate/context")
+	public ApiResponse<GenerateContextResponse> getGenerateContext(@PathVariable Long characterId) {
+		return ApiResponse.ok(generateService.getGenerateContext(characterId));
+	}
+
+	@PostMapping("/api/characters/{characterId}/generate/manual")
+	public ApiResponse<IdResponse> generateManual(@PathVariable Long characterId, @RequestBody(required = false) GenerateRequest request) {
+		return ApiResponse.ok(generateService.generateManual(characterId, request == null ? null : request.topic()));
 	}
 }

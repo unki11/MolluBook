@@ -3,6 +3,8 @@ package com.mollubook.domain.user.entity;
 import com.mollubook.global.security.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -29,6 +31,10 @@ public class UserApiKey extends BaseEntity {
 	@JoinColumn(name = "user_id")
 	private User user;
 
+	@Enumerated(EnumType.STRING)
+	@Column(name = "ai_model", nullable = false)
+	private AiModel aiModel;
+
 	@Column(nullable = false)
 	private String label;
 
@@ -39,8 +45,9 @@ public class UserApiKey extends BaseEntity {
 	private String isActive;
 
 	@Builder
-	public UserApiKey(User user, String label, String encryptedKey, String isActive) {
+	public UserApiKey(User user, AiModel aiModel, String label, String encryptedKey, String isActive) {
 		this.user = user;
+		this.aiModel = aiModel;
 		this.label = label;
 		this.encryptedKey = encryptedKey;
 		this.isActive = isActive;

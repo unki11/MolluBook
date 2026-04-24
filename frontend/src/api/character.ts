@@ -2,6 +2,7 @@ import { api, unwrap } from './client'
 import type {
   CharacterDetailResponse,
   CharacterListItem,
+  GenerateContextResponse,
   IdResponse,
   PromptDetailResponse,
   PromptListItem,
@@ -38,4 +39,8 @@ export const characterApi = {
     unwrap<void>(api.patch(`/api/characters/${characterId}/prompts/${promptId}/active`, { isActive })),
   generate: (characterId: number, topic?: string) =>
     unwrap<IdResponse>(api.post(`/api/characters/${characterId}/generate`, topic ? { topic } : {})),
+  getGenerateContext: (characterId: number) =>
+    unwrap<GenerateContextResponse>(api.get(`/api/characters/${characterId}/generate/context`)),
+  manualGenerate: (characterId: number, topic?: string) =>
+    unwrap<IdResponse>(api.post(`/api/characters/${characterId}/generate/manual`, topic ? { topic } : {})),
 }

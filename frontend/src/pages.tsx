@@ -1,4 +1,4 @@
-import type { FormEvent, ReactNode } from 'react'
+﻿import type { FormEvent, ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Link,
@@ -31,6 +31,7 @@ import { useCommunities, useWorlds } from './hooks'
 import { formatDate, formatDateTime, safe } from './lib'
 import { useAuthStore } from './store/authStore'
 import type {
+  AiModel,
   CharacterListItem,
   CommentThread,
   CommunityListItem,
@@ -38,6 +39,7 @@ import type {
   PostListItem,
   PromptListItem,
   PromptUpsertRequest,
+  UserApiKeyListItem,
 } from './types'
 
 function useCommunityScaffold(activeSlug?: string, activeWorldSlug?: string) {
@@ -157,7 +159,7 @@ export function FeedPage() {
           }),
         )
       } catch (caught) {
-        setPostError(caught instanceof Error ? caught.message : '글 목록을 불러오지 못했습니다.')
+        setPostError(caught instanceof Error ? caught.message : '湲 紐⑸줉??遺덈윭?ㅼ? 紐삵뻽?듬땲??')
       } finally {
         setFetchingPosts(false)
       }
@@ -180,7 +182,7 @@ export function FeedPage() {
           <div>
             <h1 className="page-title">{activeCommunity ? activeCommunity.name : '전체 피드'}</h1>
             <p className="page-subtitle">
-              {activeCommunity?.description ?? '모든 세계관의 AI 캐릭터 글을 시간순으로 관찰합니다.'}
+              {activeCommunity?.description ?? '모든 세계관의 AI 캐릭터 글을 실시간으로 확인할 수 있습니다.'}
             </p>
           </div>
           <div className="feed-meta-pill">{posts.length} posts</div>
@@ -191,7 +193,7 @@ export function FeedPage() {
         {postError ? <ErrorBlock message={postError} /> : null}
 
         {!loading && !fetchingPosts && !posts.length ? (
-          <EmptyState title="아직 글이 없습니다" description="첫 생성이 이루어지면 이 피드에서 바로 확인할 수 있습니다." />
+          <EmptyState title="?꾩쭅 湲???놁뒿?덈떎" description="泥??앹꽦???대（?댁?硫????쇰뱶?먯꽌 諛붾줈 ?뺤씤?????덉뒿?덈떎." />
         ) : null}
 
         <div className="stack">
@@ -211,7 +213,7 @@ export function FeedPage() {
               <div className="post-preview">{post.content}</div>
               <div className="post-card-footer">
                 <VotePill likeCount={post.likeCount} dislikeCount={post.dislikeCount} myVote={null} />
-                <span className="comment-chip">댓글 {post.commentCount}</span>
+                <span className="comment-chip">?볤? {post.commentCount}</span>
               </div>
             </Link>
           ))}
@@ -280,7 +282,7 @@ export function PostDetailPage() {
           <>
             <div className="breadcrumb">
               <Link to={`/c/${post.community.slug}`}>{post.community.name}</Link>
-              <span>›</span>
+              <span>/</span>
               <span>{post.character.name}</span>
             </div>
             <section className="post-detail-card">
@@ -303,7 +305,7 @@ export function PostDetailPage() {
             <SectionCard title={`댓글 ${comments.length}`}>
               {commentError ? <ErrorBlock message={commentError} /> : null}
               {!commentError && !comments.length ? (
-                <EmptyState title="댓글이 없습니다" description="AI 캐릭터의 대화는 여기에 이어집니다." />
+                <EmptyState title="댓글이 없습니다" description="AI 캐릭터들의 대화는 여기에 이어집니다." />
               ) : null}
               <div className="comment-stack">
                 {comments.map((thread) => (
@@ -381,14 +383,14 @@ export function MyPage() {
     event.preventDefault()
     await userApi.updateMe({ nickname })
     await refreshMe()
-    setMessage('기본 정보를 저장했습니다.')
+    setMessage('湲곕낯 ?뺣낫瑜???ν뻽?듬땲??')
   }
 
   async function submitPassword(event: FormEvent) {
     event.preventDefault()
     await userApi.updatePassword(passwordForm)
     setPasswordForm({ currentPassword: '', newPassword: '' })
-    setMessage('비밀번호를 변경했습니다.')
+    setMessage('鍮꾨?踰덊샇瑜?蹂寃쏀뻽?듬땲??')
   }
 
   return (
@@ -399,6 +401,9 @@ export function MyPage() {
             <h1 className="page-title">내 계정</h1>
             <p className="page-subtitle">계정 정보와 내 캐릭터를 관리합니다.</p>
           </div>
+          <Link className="primary-btn" to="/my/api-keys">
+            API 키 관리
+          </Link>
         </div>
         {message ? <div className="success-block">{message}</div> : null}
         <SectionCard>
@@ -449,7 +454,7 @@ export function MyPage() {
         </SectionCard>
         <SectionCard title={`내 캐릭터 ${myCharacters.length}`}>
           {!myCharacters.length ? (
-            <EmptyState title="아직 소유한 캐릭터가 없습니다" description="커뮤니티를 고른 뒤 새 캐릭터를 만들 수 있습니다." />
+            <EmptyState title="아직 보유한 캐릭터가 없습니다" description="커뮤니티를 고른 뒤 새 캐릭터를 만들 수 있습니다." />
           ) : (
             <div className="list">
               {myCharacters.map((character) => (
@@ -499,7 +504,7 @@ function CharacterFormPage({ mode }: { mode: 'create' | 'edit' }) {
       return
     }
     await characterApi.update(Number(params.characterId), { name })
-    setMessage('캐릭터 정보를 저장했습니다.')
+    setMessage('罹먮┃???뺣낫瑜???ν뻽?듬땲??')
   }
 
   return (
@@ -507,14 +512,14 @@ function CharacterFormPage({ mode }: { mode: 'create' | 'edit' }) {
       <div className="stack wide-stack">
         <div className="breadcrumb">
           <Link to="/">홈</Link>
-          <span>›</span>
-          <span>{mode === 'create' ? '캐릭터 생성' : '캐릭터 수정'}</span>
+          <span>/</span>
+          <span>{mode === 'create' ? '罹먮┃???앹꽦' : '罹먮┃???섏젙'}</span>
         </div>
         <SectionCard title={mode === 'create' ? '새 캐릭터 만들기' : '캐릭터 수정'}>
           <form className="stack form-stack" onSubmit={onSubmit}>
             {mode === 'create' && (
               <label className="field">
-                <span className="field-label">커뮤니티</span>
+                <span className="field-label">而ㅻ??덊떚</span>
                 <select
                   className="field-input"
                   value={communityId}
@@ -531,7 +536,7 @@ function CharacterFormPage({ mode }: { mode: 'create' | 'edit' }) {
               </label>
             )}
             <label className="field">
-              <span className="field-label">캐릭터 이름</span>
+              <span className="field-label">罹먮┃???대쫫</span>
               <input className="field-input" value={name} onChange={(event) => setName(event.target.value)} required />
             </label>
             {message ? <div className="success-block">{message}</div> : null}
@@ -568,7 +573,7 @@ export function CharacterDetailPage() {
         })
         setPosts(response.posts)
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : '캐릭터 정보를 불러오지 못했습니다.')
+        setError(caught instanceof Error ? caught.message : '罹먮┃???뺣낫瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??')
       }
     })()
   }, [characterId])
@@ -595,7 +600,7 @@ export function CharacterDetailPage() {
         <div className="stack wide-stack">
           <div className="breadcrumb">
             <Link to={`/c/${character.community.slug}`}>{character.community.name}</Link>
-            <span>›</span>
+            <span>/</span>
             <span>{character.name}</span>
           </div>
           <section className="hero-card">
@@ -619,6 +624,9 @@ export function CharacterDetailPage() {
                 <Link className="gnb-btn" to={`/characters/${character.id}/edit`}>
                   수정
                 </Link>
+                <Link className="gnb-btn" to={`/characters/${character.id}/manual-generate`}>
+                  글 수동 생성
+                </Link>
                 <Link className="gnb-btn primary" to={`/characters/${character.id}/prompts`}>
                   프롬프트
                 </Link>
@@ -627,7 +635,7 @@ export function CharacterDetailPage() {
           </section>
           <SectionCard title="최근 작성 글">
             {!posts.length ? (
-              <EmptyState title="작성 글이 없습니다" description="수동 생성이나 스케줄 생성 이후 이곳에 표시됩니다." />
+              <EmptyState title="작성한 글이 없습니다" description="수동 생성이나 자동 생성 이후 이곳에 글이 표시됩니다." />
             ) : (
               <div className="list">
                 {posts.map((post) => (
@@ -653,6 +661,224 @@ export function CharacterDetailPage() {
 
 export function CharacterPromptPage() {
   return <PromptListPage kind="character" />
+}
+
+export function MyApiKeyPage() {
+  const communitiesQuery = useCommunities()
+  const navigate = useNavigate()
+  const [apiKeys, setApiKeys] = useState<UserApiKeyListItem[]>([])
+  const [form, setForm] = useState<{ label: string; apiKey: string; aiModel: AiModel }>({
+    label: '',
+    apiKey: '',
+    aiModel: 'CLAUDE',
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setApiKeys(await userApi.listApiKeys())
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : 'API 키 목록을 불러오지 못했습니다.')
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [])
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    setMessage('')
+    setError('')
+    try {
+      const response = await userApi.createApiKey(form)
+      const refreshed = await userApi.listApiKeys()
+      setApiKeys(refreshed)
+      setForm({ label: '', apiKey: '', aiModel: 'CLAUDE' })
+      setMessage(`API 키를 등록했습니다.`)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'API 키를 등록하지 못했습니다.')
+    }
+  }
+
+  return (
+    <AppFrame communities={communitiesQuery.communities}>
+      <div className="stack wide-stack">
+        <div className="breadcrumb">
+          <Link to="/my">내 정보</Link>
+          <span>/</span>
+          <span>API 키 관리</span>
+        </div>
+        <div className="feed-head">
+          <div>
+            <h1 className="page-title">API 키 관리</h1>
+            <p className="page-subtitle">AI 모델별 개인 API 키를 등록하고 현재 등록 상태를 확인합니다.</p>
+          </div>
+          <button className="gnb-btn" onClick={() => navigate('/my')}>
+            돌아가기
+          </button>
+        </div>
+        <SectionCard title="API 키 등록">
+          <form className="stack form-stack" onSubmit={onSubmit}>
+            <label className="field">
+              <span className="field-label">모델</span>
+              <select
+                className="field-input"
+                value={form.aiModel}
+                onChange={(event) => setForm((current) => ({ ...current, aiModel: event.target.value as AiModel }))}
+              >
+                <option value="CLAUDE">CLAUDE</option>
+                <option value="GEMINI">GEMINI</option>
+                <option value="CHATGPT">CHATGPT</option>
+              </select>
+            </label>
+            <label className="field">
+              <span className="field-label">라벨</span>
+              <input
+                className="field-input"
+                value={form.label}
+                onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))}
+                placeholder="예: 개인 Claude 키"
+                required
+              />
+            </label>
+            <label className="field">
+              <span className="field-label">API 키</span>
+              <input
+                className="field-input"
+                type="password"
+                value={form.apiKey}
+                onChange={(event) => setForm((current) => ({ ...current, apiKey: event.target.value }))}
+                required
+              />
+            </label>
+            {message ? <div className="success-block">{message}</div> : null}
+            {error ? <ErrorBlock message={error} /> : null}
+            <button className="primary-btn" type="submit">
+              API 키 등록
+            </button>
+          </form>
+        </SectionCard>
+        <SectionCard title={`등록된 키 ${apiKeys.length}`}>
+          {loading ? <LoadingBlock /> : null}
+          {!loading && !apiKeys.length ? (
+            <EmptyState title="등록된 API 키가 없습니다" description="모델을 선택하고 첫 번째 키를 등록하세요." />
+          ) : null}
+          {!loading && apiKeys.length ? (
+            <div className="list">
+              {apiKeys.map((item) => (
+                <div className="list-row stacked" key={item.id}>
+                  <div className="row-top">
+                    <div>
+                      <div className="row-title serif">{item.label}</div>
+                      <MetaLine
+                        items={[
+                          item.aiModel,
+                          item.maskedKey,
+                          item.isActive ? '활성' : '비활성',
+                          formatDateTime(item.createdAt),
+                        ]}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </SectionCard>
+      </div>
+    </AppFrame>
+  )
+}
+
+export function CharacterManualGeneratePage() {
+  const params = useParams()
+  const navigate = useNavigate()
+  const characterId = Number(params.characterId)
+  const [context, setContext] = useState<Awaited<ReturnType<typeof characterApi.getGenerateContext>> | null>(null)
+  const [topic, setTopic] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setLoading(true)
+        setError('')
+        setContext(await characterApi.getGenerateContext(characterId))
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : '?꾨＼?꾪듃 ?뺣낫瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??')
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [characterId])
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    try {
+      setSubmitting(true)
+      setError('')
+      const response = await characterApi.manualGenerate(characterId, topic || undefined)
+      navigate(`/posts/${response.id}`)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '?꾩떆 湲 ?앹꽦???ㅽ뙣?덉뒿?덈떎.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <AppFrame communities={[]}>
+      <div className="stack wide-stack">
+        <div className="feed-head">
+          <div>
+            <h1 className="page-title">湲 ?섎룞 ?앹꽦</h1>
+            <p className="page-subtitle">?ㅼ젣 湲 ?묒꽦???ъ슜???쒖꽦 ?꾨＼?꾪듃瑜??쒖꽌?濡??뺤씤?????꾩떆 湲???앹꽦?⑸땲??</p>
+          </div>
+        </div>
+        {loading ? <LoadingBlock /> : null}
+        {error ? <ErrorBlock message={error} /> : null}
+        {!loading && context ? (
+          <>
+            {context.sections.map((section) => (
+              <SectionCard key={section.key} title={section.title}>
+                {!section.prompts.length ? (
+                  <EmptyState title="?쒖꽦 ?꾨＼?꾪듃媛 ?놁뒿?덈떎" description="??援ш컙? ?꾩옱 ?앹꽦??諛섏쁺?섏? ?딆뒿?덈떎." />
+                ) : (
+                  <div className="list">
+                    {section.prompts.map((prompt) => (
+                      <div className="list-row stacked" key={prompt.id}>
+                        <div className="row-top">
+                          <div className="row-title">{prompt.title}</div>
+                          <span className="badge neutral">sort {prompt.sortOrder}</span>
+                        </div>
+                        <div className="prompt-preview">{prompt.content}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
+            ))}
+            <SectionCard title="?꾩떆 湲 ?앹꽦">
+              <form className="stack form-stack" onSubmit={onSubmit}>
+                <label className="field">
+                  <span className="field-label">二쇱젣</span>
+                  <input className="field-input" value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="?좏깮 ?낅젰" />
+                </label>
+                <button className="primary-btn" disabled={submitting} type="submit">
+                  湲 ?섎룞 ?앹꽦
+                </button>
+              </form>
+            </SectionCard>
+          </>
+        ) : null}
+      </div>
+    </AppFrame>
+  )
 }
 
 export function CharacterPromptCreatePage() {
@@ -701,7 +927,7 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' | 'world' })
     void (async () => {
       if (kind === 'character') {
         const detail = await characterApi.detail(parentId)
-        setTitle(`${detail.name}의 프롬프트`)
+        setTitle(`${detail.name} 프롬프트`)
         setSubtitle(`${detail.community.name} · 활성 ${prompts.filter((item) => item.isActive).length}개`)
       } else if (kind === 'world') {
         const world = worldsQuery.worlds.find((item) => item.id === parentId)
@@ -741,11 +967,11 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' | 'world' })
     } else {
       await communityApi.sortPrompts(parentId, promptOrders)
     }
-    setMessage('프롬프트 순서를 저장했습니다.')
+    setMessage('?꾨＼?꾪듃 ?쒖꽌瑜???ν뻽?듬땲??')
   }
 
   async function removePrompt(promptId: number) {
-    if (!window.confirm('이 프롬프트를 삭제하시겠습니까?')) return
+    if (!window.confirm('???꾨＼?꾪듃瑜???젣?섏떆寃좎뒿?덇퉴?')) return
     if (kind === 'character') {
       await characterApi.deletePrompt(parentId, promptId)
     } else if (kind === 'world') {
@@ -754,7 +980,7 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' | 'world' })
       await communityApi.deletePrompt(parentId, promptId)
     }
     setPrompts((current) => current.filter((item) => item.id !== promptId))
-    setMessage('프롬프트를 삭제했습니다.')
+    setMessage('?꾨＼?꾪듃瑜???젣?덉뒿?덈떎.')
   }
 
   return (
@@ -762,30 +988,30 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' | 'world' })
       <div className="stack wide-stack">
         <div className="feed-head">
           <div>
-            <h1 className="page-title">{title || '프롬프트'}</h1>
+            <h1 className="page-title">{title || '?꾨＼?꾪듃'}</h1>
             <p className="page-subtitle">{subtitle}</p>
           </div>
           <Link
             className="primary-btn"
             to={kind === 'character' ? `/characters/${parentId}/prompts/new` : kind === 'world' ? `/admin/worlds/${parentId}/prompts/new` : `/admin/communities/${parentId}/prompts/new`}
           >
-            새 프롬프트
+            ???꾨＼?꾪듃
           </Link>
         </div>
         {message ? <div className="success-block">{message}</div> : null}
-        <SectionCard title="프롬프트 목록">
+        <SectionCard title="?꾨＼?꾪듃 紐⑸줉">
           {!prompts.length ? (
-            <EmptyState title="등록된 프롬프트가 없습니다" description="첫 프롬프트를 생성하면 AI 생성 시 조합에 포함됩니다." />
+            <EmptyState title="?깅줉???꾨＼?꾪듃媛 ?놁뒿?덈떎" description="泥??꾨＼?꾪듃瑜??앹꽦?섎㈃ AI ?앹꽦 ??議고빀???ы븿?⑸땲??" />
           ) : (
             <div className="list">
               {prompts.map((prompt, index) => (
                 <div className="prompt-row" key={prompt.id}>
                   <div className="prompt-order-controls">
                     <button className="icon-btn small" onClick={() => void movePrompt(index, -1)}>
-                      ↑
+                      ??
                     </button>
                     <button className="icon-btn small" onClick={() => void movePrompt(index, 1)}>
-                      ↓
+                      ??
                     </button>
                   </div>
                   <div className="prompt-main">
@@ -802,7 +1028,7 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' | 'world' })
                       {prompt.isActive ? '비활성화' : '활성화'}
                     </button>
                     <button className="gnb-btn" onClick={() => void removePrompt(prompt.id)}>
-                      삭제
+                      ??젣
                     </button>
                     <Link
                       className="gnb-btn primary"
@@ -814,7 +1040,7 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' | 'world' })
                             : `/admin/communities/${parentId}/prompts/${prompt.id}/edit`
                       }
                     >
-                      수정
+                      ?섏젙
                     </Link>
                   </div>
                 </div>
@@ -881,16 +1107,16 @@ function PromptEditorPage({ kind, mode }: { kind: 'character' | 'community' | 'w
     } else {
       await communityApi.updatePrompt(parentId, promptId, form)
     }
-    setMessage('프롬프트 새 버전을 저장했습니다.')
+    setMessage('?꾨＼?꾪듃 ??踰꾩쟾????ν뻽?듬땲??')
   }
 
   return (
     <PromptFrame communities={communitiesQuery.communities} kind={kind}>
       <div className="stack wide-stack">
-        <SectionCard title={mode === 'create' ? '프롬프트 생성' : '프롬프트 수정'}>
+        <SectionCard title={mode === 'create' ? '?꾨＼?꾪듃 ?앹꽦' : '?꾨＼?꾪듃 ?섏젙'}>
           <form className="stack form-stack" onSubmit={onSubmit}>
             <label className="field">
-              <span className="field-label">제목</span>
+              <span className="field-label">?쒕ぉ</span>
               <input
                 className="field-input"
                 value={form.title}
@@ -899,7 +1125,7 @@ function PromptEditorPage({ kind, mode }: { kind: 'character' | 'community' | 'w
               />
             </label>
             <label className="field">
-              <span className="field-label">본문</span>
+              <span className="field-label">蹂몃Ц</span>
               <textarea
                 className="field-input field-textarea"
                 value={form.content}
@@ -908,7 +1134,7 @@ function PromptEditorPage({ kind, mode }: { kind: 'character' | 'community' | 'w
               />
             </label>
             <label className="field field-inline">
-              <span className="field-label">공개 여부</span>
+              <span className="field-label">怨듦컻 ?щ?</span>
               <input
                 checked={form.isPublic}
                 onChange={(event) => setForm((current) => ({ ...current, isPublic: event.target.checked }))}
@@ -916,7 +1142,7 @@ function PromptEditorPage({ kind, mode }: { kind: 'character' | 'community' | 'w
               />
             </label>
             <label className="field">
-              <span className="field-label">정렬 순서</span>
+              <span className="field-label">?뺣젹 ?쒖꽌</span>
               <input
                 className="field-input"
                 type="number"
@@ -1064,7 +1290,7 @@ export function AdminWorldPage() {
         <div className="feed-head">
           <div>
             <h1 className="page-title">월드 관리</h1>
-            <p className="page-subtitle">커뮤니티의 상위 세계관을 관리합니다.</p>
+            <p className="page-subtitle">커뮤니티의 상위 구조인 월드를 관리합니다.</p>
           </div>
           <Link className="primary-btn" to="/admin/worlds/new">
             새 월드
@@ -1074,7 +1300,7 @@ export function AdminWorldPage() {
         {worldsQuery.error ? <ErrorBlock message={worldsQuery.error} /> : null}
         <SectionCard title={`월드 ${worlds.length}`}>
           {!worlds.length && !worldsQuery.loading ? (
-            <EmptyState title="등록된 월드가 없습니다" description="새 월드를 생성한 뒤 커뮤니티를 연결하세요." />
+            <EmptyState title="등록된 월드가 없습니다" description="새 월드를 만든 뒤 커뮤니티를 연결하세요." />
           ) : (
             <div className="list">
               {worlds.map((world) => (
@@ -1142,6 +1368,10 @@ function WorldFormPage({ mode }: { mode: 'create' | 'edit' }) {
     <AdminFrame>
       <SectionCard title={mode === 'create' ? '월드 생성' : '월드 수정'}>
         <form className="stack form-stack" onSubmit={onSubmit}>
+          {worldsQuery.error ? <ErrorBlock message={worldsQuery.error} /> : null}
+          {!worldsQuery.loading && !worldsQuery.worlds.length ? (
+            <EmptyState title="등록된 월드가 없습니다" description="먼저 월드를 만든 뒤 커뮤니티를 연결하세요." />
+          ) : null}
           <label className="field">
             <span className="field-label">이름</span>
             <input className="field-input" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required />
@@ -1213,7 +1443,14 @@ export function AdminCommunityPage() {
                   <div className="row-top">
                     <div>
                       <div className="row-title serif">{community.name}</div>
-                      <MetaLine items={[community.slug, `캐릭터 ${community.characterCount}`, `글 ${community.postCount}`]} />
+                      <MetaLine
+                        items={[
+                          community.world ? `월드 ${community.world.name}` : '월드 미연결',
+                          community.slug,
+                          `캐릭터 ${community.characterCount}`,
+                          `글 ${community.postCount}`,
+                        ]}
+                      />
                     </div>
                     <div className="row-side">
                       <Link className="gnb-btn" to={`/admin/communities/${community.id}/prompts`}>
@@ -1277,13 +1514,21 @@ function CommunityFormPage({ mode }: { mode: 'create' | 'edit' }) {
     <AdminFrame>
       <SectionCard title={mode === 'create' ? '커뮤니티 생성' : '커뮤니티 수정'}>
         <form className="stack form-stack" onSubmit={onSubmit}>
+          {worldsQuery.error ? <ErrorBlock message={worldsQuery.error} /> : null}
+          {!worldsQuery.loading && !worldsQuery.worlds.length ? (
+            <EmptyState title="등록된 월드가 없습니다" description="먼저 월드를 만든 뒤 커뮤니티를 연결하세요." />
+          ) : null}
           <label className="field">
             <span className="field-label">월드</span>
             <select
               className="field-input"
               value={form.worldId ?? ''}
               onChange={(event) => setForm((current) => ({ ...current, worldId: event.target.value ? Number(event.target.value) : null }))}
+              required={mode === 'create'}
             >
+              <option value="" disabled={mode === 'create'}>
+                월드를 선택하세요
+              </option>
               <option value="">월드 없음</option>
               {worldsQuery.worlds.map((world) => (
                 <option key={world.id} value={world.id}>
@@ -1429,7 +1674,7 @@ export function AdminCommentPage() {
       <div className="stack">
         <SectionCard title="댓글 관리">
           <div className="notice-block">
-            현재 백엔드에는 전체 댓글 목록 조회 API가 없습니다. 댓글이 있는 글 단위로 접근할 수 있게 연결했습니다.
+            현재 백엔드에는 전체 댓글 목록 조회 API가 없습니다. 댓글이 달린 글 단위로 연결해 두었습니다.
           </div>
           <div className="list">
             {posts.map((post) => (
@@ -1529,3 +1774,4 @@ export function AdminRoute() {
   if (!me || me.systemRole !== 'ADMIN') return <Navigate replace to="/" />
   return <Outlet />
 }
+
