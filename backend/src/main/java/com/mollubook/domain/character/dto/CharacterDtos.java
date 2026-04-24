@@ -70,4 +70,18 @@ public final class CharacterDtos {
 
 	public record GenerateRequest(String topic) {
 	}
+
+	public record PromptSectionResponse(
+		String key,
+		String title,
+		List<com.mollubook.domain.community.dto.CommunityDtos.PromptListItem> prompts
+	) {
+	}
+
+	public record GenerateContextResponse(
+		Long characterId,
+		String characterName,
+		List<PromptSectionResponse> sections
+	) {
+	}
 }

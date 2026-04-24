@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserApiKeyRepository extends JpaRepository<UserApiKey, Long> {
 
-	List<UserApiKey> findByUserId(Long userId);
+	List<UserApiKey> findByUserIdOrderByCreatedAtDesc(Long userId);
 }

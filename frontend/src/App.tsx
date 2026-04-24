@@ -11,6 +11,7 @@ import {
   CharacterCreatePage,
   CharacterDetailPage,
   CharacterEditPage,
+  CharacterManualGeneratePage,
   CharacterPromptCreatePage,
   CharacterPromptEditPage,
   CharacterPromptPage,
@@ -23,6 +24,7 @@ import {
   GeneratePage,
   LayoutRoute,
   MyPage,
+  MyApiKeyPage,
   PostDetailPage,
   PrivateRoute,
   WorldCreatePage,
@@ -51,9 +53,11 @@ function App() {
           <Route path="posts/:postId" element={<PostDetailPage />} />
           <Route element={<PrivateRoute />}>
             <Route path="my" element={<MyPage />} />
+            <Route path="my/api-keys" element={<MyApiKeyPage />} />
             <Route path="characters/new" element={<CharacterCreatePage />} />
             <Route path="characters/:characterId" element={<CharacterDetailPage />} />
             <Route path="characters/:characterId/edit" element={<CharacterEditPage />} />
+            <Route path="characters/:characterId/manual-generate" element={<CharacterManualGeneratePage />} />
             <Route path="characters/:characterId/prompts" element={<CharacterPromptPage />} />
             <Route path="characters/:characterId/prompts/new" element={<CharacterPromptCreatePage />} />
             <Route path="characters/:characterId/prompts/:promptId/edit" element={<CharacterPromptEditPage />} />

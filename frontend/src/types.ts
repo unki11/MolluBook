@@ -41,6 +41,17 @@ export type MeResponse = {
   createdAt: string
 }
 
+export type AiModel = 'CLAUDE' | 'GEMINI' | 'CHATGPT'
+
+export type UserApiKeyListItem = {
+  id: number
+  label: string
+  aiModel: AiModel
+  isActive: boolean
+  maskedKey: string
+  createdAt: string
+}
+
 export type CommunityListItem = {
   id: number
   name: string
@@ -245,4 +256,16 @@ export type PromptUpsertRequest = {
   content: string
   isPublic: boolean
   sortOrder: number | null
+}
+
+export type PromptSectionResponse = {
+  key: string
+  title: string
+  prompts: PromptListItem[]
+}
+
+export type GenerateContextResponse = {
+  characterId: number
+  characterName: string
+  sections: PromptSectionResponse[]
 }
