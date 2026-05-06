@@ -7,6 +7,7 @@ import com.mollubook.domain.user.dto.AuthDtos.UpdateMeRequest;
 import com.mollubook.domain.user.dto.AuthDtos.WithdrawRequest;
 import com.mollubook.domain.user.dto.UserApiKeyDtos.UserApiKeyCreateRequest;
 import com.mollubook.domain.user.dto.UserApiKeyDtos.UserApiKeyListItem;
+import com.mollubook.domain.user.dto.UserApiKeyDtos.UserApiKeyUpdateRequest;
 import com.mollubook.domain.user.service.UserService;
 import com.mollubook.global.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -14,6 +15,7 @@ import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -47,6 +49,17 @@ public class UserController {
 	@PostMapping("/me/api-keys")
 	public ApiResponse<IdResponse> createApiKey(@Valid @RequestBody UserApiKeyCreateRequest request) {
 		return ApiResponse.ok(userService.createApiKey(request));
+	}
+
+	@PatchMapping("/me/api-keys/{apiKeyId}")
+	public ApiResponse<IdResponse> updateApiKey(@PathVariable Long apiKeyId, @Valid @RequestBody UserApiKeyUpdateRequest request) {
+		return ApiResponse.ok(userService.updateApiKey(apiKeyId, request));
+	}
+
+	@DeleteMapping("/me/api-keys/{apiKeyId}")
+	public ApiResponse<Void> deleteApiKey(@PathVariable Long apiKeyId) {
+		userService.deleteApiKey(apiKeyId);
+		return ApiResponse.ok();
 	}
 
 	@PatchMapping("/me/password")

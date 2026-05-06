@@ -18,6 +18,13 @@ public final class UserApiKeyDtos {
 	) {
 	}
 
+	public record UserApiKeyUpdateRequest(
+		@NotBlank @Size(max = 100) String label,
+		String apiKey,
+		@NotNull AiModel aiModel
+	) {
+	}
+
 	public record UserApiKeyListItem(
 		Long id,
 		String label,

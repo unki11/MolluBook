@@ -1,5 +1,7 @@
 package com.mollubook.domain.character.service;
 
+import com.mollubook.domain.character.dto.CharacterDtos.GenerateContextResponse;
+import com.mollubook.domain.character.dto.CharacterDtos.PromptSectionResponse;
 import com.mollubook.domain.character.entity.Character;
 import com.mollubook.domain.character.repository.CharacterPromptRepository;
 import com.mollubook.domain.community.dto.CommunityDtos.PromptListItem;
@@ -8,14 +10,16 @@ import com.mollubook.domain.community.repository.CommunityPromptRepository;
 import com.mollubook.domain.community.repository.CommunityRepository;
 import com.mollubook.domain.post.entity.Post;
 import com.mollubook.domain.post.repository.PostRepository;
-import com.mollubook.domain.user.entity.UseYn;
 import com.mollubook.domain.user.dto.AuthDtos.IdResponse;
+import com.mollubook.domain.user.entity.UseYn;
+import com.mollubook.domain.user.entity.UserApiKey;
 import com.mollubook.domain.world.repository.WorldPromptRepository;
-import com.mollubook.domain.character.dto.CharacterDtos.GenerateContextResponse;
-import com.mollubook.domain.character.dto.CharacterDtos.PromptSectionResponse;
 import com.mollubook.global.exception.CustomException;
 import com.mollubook.global.exception.ErrorCode;
 import com.mollubook.global.security.SecurityUtils;
+import com.mollubook.infra.ai.AiGeneratedPost;
+import com.mollubook.infra.ai.AiProviderRouter;
+import com.mollubook.infra.ai.ManualCommunityPostPromptBuilder;
 import com.mollubook.infra.claude.ClaudeClient;
 import com.mollubook.infra.claude.ClaudePromptBuilder;
 import com.mollubook.infra.claude.ClaudeResponse;
@@ -36,8 +40,21 @@ public class GenerateService {
 	private final WorldPromptRepository worldPromptRepository;
 	private final CommunityPromptRepository communityPromptRepository;
 	private final CharacterPromptRepository characterPromptRepository;
+	private final ManualCommunityPostPromptBuilder manualCommunityPostPromptBuilder;
+	private final AiProviderRouter aiProviderRouter;
 
-	public GenerateService(CharacterService characterService, ClaudePromptBuilder claudePromptBuilder, ClaudeClient claudeClient, PostRepository postRepository, CommunityRepository communityRepository, WorldPromptRepository worldPromptRepository, CommunityPromptRepository communityPromptRepository, CharacterPromptRepository characterPromptRepository) {
+	public GenerateService(
+		CharacterService characterService,
+		ClaudePromptBuilder claudePromptBuilder,
+		ClaudeClient claudeClient,
+		PostRepository postRepository,
+		CommunityRepository communityRepository,
+		WorldPromptRepository worldPromptRepository,
+		CommunityPromptRepository communityPromptRepository,
+		CharacterPromptRepository characterPromptRepository,
+		ManualCommunityPostPromptBuilder manualCommunityPostPromptBuilder,
+		AiProviderRouter aiProviderRouter
+	) {
 		this.characterService = characterService;
 		this.claudePromptBuilder = claudePromptBuilder;
 		this.claudeClient = claudeClient;
@@ -46,6 +63,8 @@ public class GenerateService {
 		this.worldPromptRepository = worldPromptRepository;
 		this.communityPromptRepository = communityPromptRepository;
 		this.characterPromptRepository = characterPromptRepository;
+		this.manualCommunityPostPromptBuilder = manualCommunityPostPromptBuilder;
+		this.aiProviderRouter = aiProviderRouter;
 	}
 
 	public GenerateContextResponse getGenerateContext(Long characterId) {
@@ -60,7 +79,6 @@ public class GenerateService {
 				"world",
 				"worlds_prompts",
 				worldPromptRepository.findByWorldIdOrderBySortOrderAsc(community.getWorld().getId()).stream()
-					.filter(prompt -> prompt.isActive())
 					.map(prompt -> new PromptListItem(prompt.getId(), prompt.getTitle(), prompt.getContent(), prompt.isActive(), prompt.isPublic(), prompt.getVersion(), prompt.getSortOrder(), prompt.getCreatedAt()))
 					.toList()
 			));
@@ -69,7 +87,6 @@ public class GenerateService {
 			"community",
 			"communities_prompts",
 			communityPromptRepository.findByCommunityIdOrderBySortOrderAsc(community.getId()).stream()
-				.filter(prompt -> prompt.isActive())
 				.map(prompt -> new PromptListItem(prompt.getId(), prompt.getTitle(), prompt.getContent(), prompt.isActive(), prompt.isPublic(), prompt.getVersion(), prompt.getSortOrder(), prompt.getCreatedAt()))
 				.toList()
 		));
@@ -77,7 +94,6 @@ public class GenerateService {
 			"character",
 			"character_prompts",
 			characterPromptRepository.findByCharacterIdOrderBySortOrderAsc(character.getId()).stream()
-				.filter(prompt -> prompt.isActive())
 				.map(prompt -> new PromptListItem(prompt.getId(), prompt.getTitle(), prompt.getContent(), prompt.isActive(), prompt.isPublic(), prompt.getVersion(), prompt.getSortOrder(), prompt.getCreatedAt()))
 				.toList()
 		));
@@ -112,12 +128,18 @@ public class GenerateService {
 			throw new CustomException(ErrorCode.CHARACTER_003);
 		}
 
-		String safeTopic = topic == null || topic.isBlank() ? "자유 주제" : topic.trim();
+		UserApiKey apiKey = character.getApiKey();
+		if (apiKey == null) {
+			throw new CustomException(ErrorCode.COMMON_002);
+		}
+
+		String prompt = manualCommunityPostPromptBuilder.build(character, topic);
+		AiGeneratedPost generatedPost = aiProviderRouter.generateCommunityPost(apiKey, prompt);
 		Post post = postRepository.save(Post.builder()
 			.community(character.getCommunity())
 			.character(character)
-			.title("[임시] " + character.getName() + "의 수동 생성 글")
-			.content("이 글은 AI 연동 전 수동 생성 테스트용 임시 글입니다.\n\n주제: " + safeTopic + "\n\n실제 생성 시 world/community/character 활성 프롬프트가 함께 사용됩니다.")
+			.title(generatedPost.title())
+			.content(generatedPost.content())
 			.likeCount(0)
 			.dislikeCount(0)
 			.commentCount(0)

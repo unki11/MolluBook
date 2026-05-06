@@ -7,7 +7,9 @@ import com.mollubook.domain.user.dto.AuthDtos.UpdateMeRequest;
 import com.mollubook.domain.user.dto.AuthDtos.WithdrawRequest;
 import com.mollubook.domain.user.dto.UserApiKeyDtos.UserApiKeyCreateRequest;
 import com.mollubook.domain.user.dto.UserApiKeyDtos.UserApiKeyListItem;
+import com.mollubook.domain.user.dto.UserApiKeyDtos.UserApiKeyUpdateRequest;
 import com.mollubook.domain.user.entity.OAuthProvider;
+import com.mollubook.domain.user.entity.UseYn;
 import com.mollubook.domain.user.entity.User;
 import com.mollubook.domain.user.entity.UserApiKey;
 import com.mollubook.domain.user.entity.UserOauth;
@@ -58,7 +60,7 @@ public class UserService {
 
 	public List<UserApiKeyListItem> getMyApiKeys() {
 		User user = currentUserEntity();
-		return userApiKeyRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
+		return userApiKeyRepository.findByUserIdAndUseYnOrderByCreatedAtDesc(user.getId(), UseYn.Y).stream()
 			.map(apiKey -> new UserApiKeyListItem(
 				apiKey.getId(),
 				apiKey.getLabel(),
@@ -78,8 +80,22 @@ public class UserService {
 			.label(request.label().trim())
 			.encryptedKey(encryptionUtil.encrypt(request.apiKey().trim()))
 			.isActive("Y")
+			.useYn(UseYn.Y)
 			.build());
 		return new IdResponse(apiKey.getId());
+	}
+
+	public IdResponse updateApiKey(Long apiKeyId, UserApiKeyUpdateRequest request) {
+		UserApiKey apiKey = getOwnedApiKey(apiKeyId);
+		apiKey.update(request.aiModel(), request.label().trim());
+		if (request.apiKey() != null && !request.apiKey().isBlank()) {
+			apiKey.updateEncryptedKey(encryptionUtil.encrypt(request.apiKey().trim()));
+		}
+		return new IdResponse(apiKey.getId());
+	}
+
+	public void deleteApiKey(Long apiKeyId) {
+		getOwnedApiKey(apiKeyId).delete();
 	}
 
 	public void updatePassword(PasswordUpdateRequest request) {
@@ -103,6 +119,15 @@ public class UserService {
 	public User currentUserEntity() {
 		return userRepository.findById(SecurityUtils.currentUser().id())
 			.orElseThrow(() -> new CustomException(ErrorCode.USER_001));
+	}
+
+	private UserApiKey getOwnedApiKey(Long apiKeyId) {
+		UserApiKey apiKey = userApiKeyRepository.findByIdAndUseYn(apiKeyId, UseYn.Y)
+			.orElseThrow(() -> new CustomException(ErrorCode.USER_001));
+		if (!apiKey.getUser().getId().equals(SecurityUtils.currentUser().id())) {
+			throw new CustomException(ErrorCode.COMMON_001);
+		}
+		return apiKey;
 	}
 
 	private String maskKey(String rawKey) {

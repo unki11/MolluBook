@@ -15,9 +15,9 @@ export const characterApi = {
     unwrap<CharacterListItem[]>(api.get(`/api/communities/${communityId}/characters`)),
   detail: (characterId: number) =>
     unwrap<CharacterDetailResponse>(api.get(`/api/characters/${characterId}`)),
-  create: (communityId: number, payload: { name: string }) =>
+  create: (communityId: number, payload: { name: string; apiKeyId?: number | null }) =>
     unwrap<IdResponse>(api.post(`/api/communities/${communityId}/characters`, payload)),
-  update: (characterId: number, payload: { name: string }) =>
+  update: (characterId: number, payload: { name: string; apiKeyId?: number | null }) =>
     unwrap<IdResponse>(api.patch(`/api/characters/${characterId}`, payload)),
   remove: (characterId: number) => unwrap<void>(api.delete(`/api/characters/${characterId}`)),
   adminRemove: (characterId: number) => unwrap<void>(api.delete(`/api/admin/characters/${characterId}`)),

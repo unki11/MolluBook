@@ -11,10 +11,10 @@ public final class CharacterDtos {
 	private CharacterDtos() {
 	}
 
-	public record CharacterCreateRequest(@NotBlank @Size(max = 100) String name) {
+	public record CharacterCreateRequest(@NotBlank @Size(max = 100) String name, Long apiKeyId) {
 	}
 
-	public record CharacterUpdateRequest(@NotBlank @Size(max = 100) String name) {
+	public record CharacterUpdateRequest(@NotBlank @Size(max = 100) String name, Long apiKeyId) {
 	}
 
 	public record CharacterStatusRequest(@NotBlank String status) {
@@ -27,6 +27,9 @@ public final class CharacterDtos {
 	}
 
 	public record WorldSummary(Long id, String name, String slug) {
+	}
+
+	public record UserApiKeySummary(Long id, String label, String aiModel, String maskedKey) {
 	}
 
 	public record CharacterListItem(
@@ -47,7 +50,8 @@ public final class CharacterDtos {
 		LocalDateTime lastPostAt,
 		CommunitySummary community,
 		WorldSummary world,
-		OwnerSummary owner
+		OwnerSummary owner,
+		UserApiKeySummary apiKey
 	) {
 	}
 

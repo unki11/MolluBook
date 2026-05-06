@@ -52,6 +52,13 @@ export type UserApiKeyListItem = {
   createdAt: string
 }
 
+export type CharacterApiKeySummary = {
+  id: number
+  label: string
+  aiModel: AiModel
+  maskedKey: string
+}
+
 export type CommunityListItem = {
   id: number
   name: string
@@ -135,6 +142,7 @@ export type CharacterDetailResponse = {
   community: CharacterCommunitySummary
   world: WorldRef | null
   owner: CharacterOwnerSummary
+  apiKey: CharacterApiKeySummary | null
 }
 
 export type NamedRef = {

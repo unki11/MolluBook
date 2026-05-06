@@ -44,12 +44,30 @@ public class UserApiKey extends BaseEntity {
 	@Column(nullable = false, length = 1)
 	private String isActive;
 
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false, length = 1)
+	private UseYn useYn;
+
 	@Builder
-	public UserApiKey(User user, AiModel aiModel, String label, String encryptedKey, String isActive) {
+	public UserApiKey(User user, AiModel aiModel, String label, String encryptedKey, String isActive, UseYn useYn) {
 		this.user = user;
 		this.aiModel = aiModel;
 		this.label = label;
 		this.encryptedKey = encryptedKey;
 		this.isActive = isActive;
+		this.useYn = useYn;
+	}
+
+	public void update(AiModel aiModel, String label) {
+		this.aiModel = aiModel;
+		this.label = label;
+	}
+
+	public void updateEncryptedKey(String encryptedKey) {
+		this.encryptedKey = encryptedKey;
+	}
+
+	public void delete() {
+		this.useYn = UseYn.N;
 	}
 }
