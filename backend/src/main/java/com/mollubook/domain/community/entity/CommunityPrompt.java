@@ -91,6 +91,10 @@ public class CommunityPrompt extends BaseEntity {
 		isActive = active;
 	}
 
+	public void updateGroupId(Long groupId) {
+		this.groupId = groupId;
+	}
+
 	public void delete() {
 		this.useYn = UseYn.N;
 	}

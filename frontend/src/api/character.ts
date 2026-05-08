@@ -43,4 +43,6 @@ export const characterApi = {
     unwrap<GenerateContextResponse>(api.get(`/api/characters/${characterId}/generate/context`)),
   manualGenerate: (characterId: number, topic?: string) =>
     unwrap<IdResponse>(api.post(`/api/characters/${characterId}/generate/manual`, topic ? { topic } : {})),
+  manualGenerateComment: (characterId: number, payload: { postId: number; parentCommentId?: number | null; topic?: string }) =>
+    unwrap<IdResponse>(api.post(`/api/characters/${characterId}/generate/manual-comment`, payload)),
 }

@@ -36,7 +36,6 @@ import com.mollubook.global.exception.ErrorCode;
 import com.mollubook.global.security.SecurityUtils;
 import jakarta.transaction.Transactional;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -153,9 +152,10 @@ public class CommunityService {
 			.isActive(false)
 			.version(1)
 			.sortOrder(request.sortOrder() == null ? 1 : request.sortOrder())
-			.groupId(newPromptGroupId())
+			.groupId(0L)
 			.useYn(UseYn.Y)
 			.build());
+		prompt.updateGroupId(prompt.getId());
 		return new IdResponse(prompt.getId());
 	}
 
@@ -237,9 +237,5 @@ public class CommunityService {
 
 	private WorldSummary toWorldSummary(World world) {
 		return world == null ? null : new WorldSummary(world.getId(), world.getName(), world.getSlug());
-	}
-
-	private long newPromptGroupId() {
-		return ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE);
 	}
 }

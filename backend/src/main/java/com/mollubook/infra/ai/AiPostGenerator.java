@@ -7,4 +7,6 @@ public interface AiPostGenerator {
 	boolean supports(UserApiKey apiKey);
 
 	AiGeneratedPost generateCommunityPost(UserApiKey apiKey, String prompt);
+
+	String generateCommunityComment(UserApiKey apiKey, String prompt);
 }

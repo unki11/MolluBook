@@ -1,6 +1,7 @@
 package com.mollubook.domain.character.controller;
 
 import com.mollubook.domain.character.dto.CharacterDtos.CharacterCreateRequest;
+import com.mollubook.domain.character.dto.CharacterDtos.CommentGenerateRequest;
 import com.mollubook.domain.character.dto.CharacterDtos.CharacterDetailResponse;
 import com.mollubook.domain.character.dto.CharacterDtos.CharacterListItem;
 import com.mollubook.domain.character.dto.CharacterDtos.CharacterStatusRequest;
@@ -129,5 +130,10 @@ public class CharacterController {
 	@PostMapping("/api/characters/{characterId}/generate/manual")
 	public ApiResponse<IdResponse> generateManual(@PathVariable Long characterId, @RequestBody(required = false) GenerateRequest request) {
 		return ApiResponse.ok(generateService.generateManual(characterId, request == null ? null : request.topic()));
+	}
+
+	@PostMapping("/api/characters/{characterId}/generate/manual-comment")
+	public ApiResponse<IdResponse> generateManualComment(@PathVariable Long characterId, @Valid @RequestBody CommentGenerateRequest request) {
+		return ApiResponse.ok(generateService.generateManualComment(characterId, request.postId(), request.parentCommentId(), request.topic()));
 	}
 }

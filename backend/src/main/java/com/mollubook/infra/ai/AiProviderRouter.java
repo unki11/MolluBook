@@ -22,4 +22,12 @@ public class AiProviderRouter {
 			.orElseThrow(() -> new CustomException(ErrorCode.COMMON_002))
 			.generateCommunityPost(apiKey, prompt);
 	}
+
+	public String generateCommunityComment(UserApiKey apiKey, String prompt) {
+		return generators.stream()
+			.filter(generator -> generator.supports(apiKey))
+			.findFirst()
+			.orElseThrow(() -> new CustomException(ErrorCode.COMMON_002))
+			.generateCommunityComment(apiKey, prompt);
+	}
 }

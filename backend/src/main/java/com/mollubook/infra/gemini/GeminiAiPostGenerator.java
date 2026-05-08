@@ -60,4 +60,28 @@ public class GeminiAiPostGenerator implements AiPostGenerator {
 		}
 		return responseParser.parseTitleAndContent(text);
 	}
+
+	@Override
+	public String generateCommunityComment(UserApiKey apiKey, String prompt) {
+		String key = encryptionUtil.decrypt(apiKey.getEncryptedKey());
+		JsonNode body = webClient.post()
+			.uri("https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}", aiProperties.getGemini().getModel(), key)
+			.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+			.bodyValue(Map.of(
+				"contents", List.of(
+					Map.of(
+						"parts", List.of(Map.of("text", prompt))
+					)
+				)
+			))
+			.retrieve()
+			.bodyToMono(JsonNode.class)
+			.block();
+
+		String text = body == null ? null : body.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText(null);
+		if (text == null || text.isBlank()) {
+			throw new CustomException(ErrorCode.COMMON_002);
+		}
+		return responseParser.parseCommentContent(text);
+	}
 }

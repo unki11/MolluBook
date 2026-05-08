@@ -27,4 +27,19 @@ public class AiResponseParser {
 		}
 		return new AiGeneratedPost(title, content);
 	}
+
+	public String parseCommentContent(String rawText) {
+		if (rawText == null || rawText.isBlank()) {
+			throw new CustomException(ErrorCode.COMMON_002);
+		}
+
+		String content = rawText.trim();
+		if (content.startsWith("댓글:")) {
+			content = content.substring(3).trim();
+		}
+		if (content.isBlank()) {
+			throw new CustomException(ErrorCode.COMMON_002);
+		}
+		return content;
+	}
 }

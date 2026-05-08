@@ -75,6 +75,9 @@ public final class CharacterDtos {
 	public record GenerateRequest(String topic) {
 	}
 
+	public record CommentGenerateRequest(@NotNull Long postId, Long parentCommentId, String topic) {
+	}
+
 	public record PromptSectionResponse(
 		String key,
 		String title,

@@ -59,4 +59,27 @@ public class ClaudeAiPostGenerator implements AiPostGenerator {
 		}
 		return responseParser.parseTitleAndContent(text);
 	}
+
+	@Override
+	public String generateCommunityComment(UserApiKey apiKey, String prompt) {
+		JsonNode body = webClient.post()
+			.uri("https://api.anthropic.com/v1/messages")
+			.header("x-api-key", encryptionUtil.decrypt(apiKey.getEncryptedKey()))
+			.header("anthropic-version", "2023-06-01")
+			.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+			.bodyValue(Map.of(
+				"model", aiProperties.getClaude().getModel(),
+				"max_tokens", aiProperties.getClaude().getMaxTokens(),
+				"messages", List.of(Map.of("role", "user", "content", prompt))
+			))
+			.retrieve()
+			.bodyToMono(JsonNode.class)
+			.block();
+
+		String text = body == null ? null : body.path("content").path(0).path("text").asText(null);
+		if (text == null || text.isBlank()) {
+			throw new CustomException(ErrorCode.COMMON_002);
+		}
+		return responseParser.parseCommentContent(text);
+	}
 }

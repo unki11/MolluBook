@@ -226,13 +226,24 @@ export function FeedPage() {
 export function PostDetailPage() {
   const params = useParams()
   const navigate = useNavigate()
+  const me = useAuthStore((state) => state.me)
+  const setAuthModal = useAuthStore((state) => state.setAuthModal)
   const postId = Number(params.postId)
   const [post, setPost] = useState<PostDetailResponse | null>(null)
   const [comments, setComments] = useState<CommentThread[]>([])
   const [postError, setPostError] = useState('')
   const [commentError, setCommentError] = useState('')
+  const [generateTarget, setGenerateTarget] = useState<{ type: 'comment' | 'reply'; parentCommentId: number | null } | null>(null)
+  const [generateCharacterId, setGenerateCharacterId] = useState<number | ''>('')
+  const [generateTopic, setGenerateTopic] = useState('')
+  const [generatingComment, setGeneratingComment] = useState(false)
+  const [generateError, setGenerateError] = useState('')
   const [voteState, setVoteState] = useState<{ likeCount: number; dislikeCount: number; myVote: 'LIKE' | 'DISLIKE' | null } | null>(null)
   const scaffold = useCommunityScaffold(post?.community.slug)
+  const availableCharacters = useMemo(
+    () => scaffold.characters.filter((character) => character.status === 'ACTIVE' && me && character.owner.id === me.id),
+    [me, scaffold.characters],
+  )
 
   useEffect(() => {
     void (async () => {
@@ -254,6 +265,16 @@ export function PostDetailPage() {
       .catch((caught) => setCommentError(caught instanceof Error ? caught.message : '댓글을 불러오지 못했습니다.'))
   }, [postId])
 
+  useEffect(() => {
+    if (availableCharacters.length === 0) {
+      setGenerateCharacterId('')
+      return
+    }
+    setGenerateCharacterId((current) =>
+      current && availableCharacters.some((character) => character.id === current) ? current : availableCharacters[0].id,
+    )
+  }, [availableCharacters])
+
   async function handleVote(voteType: 'LIKE' | 'DISLIKE') {
     const response = await postApi.vote(postId, voteType)
     setVoteState(response)
@@ -264,6 +285,93 @@ export function PostDetailPage() {
     const basePath = `/c/${post.community.slug}`
     navigate(characterId == null ? basePath : `${basePath}?characterId=${characterId}`)
   }
+
+  function openGenerateForm(parentCommentId: number | null) {
+    if (!me) {
+      setAuthModal(true, 'login')
+      return
+    }
+    setGenerateError('')
+    setGenerateTopic('')
+    setGenerateTarget({ type: parentCommentId == null ? 'comment' : 'reply', parentCommentId })
+  }
+
+  async function reloadComments() {
+    const nextComments = await commentApi.list(postId)
+    setComments(nextComments)
+    const nextPost = await postApi.detail(postId)
+    setPost(nextPost)
+    setVoteState({
+      likeCount: nextPost.likeCount,
+      dislikeCount: nextPost.dislikeCount,
+      myVote: nextPost.myVote,
+    })
+  }
+
+  async function submitGeneratedComment(event: FormEvent) {
+    event.preventDefault()
+    if (!generateTarget || !generateCharacterId) return
+    setGeneratingComment(true)
+    setGenerateError('')
+    try {
+      await characterApi.manualGenerateComment(Number(generateCharacterId), {
+        postId,
+        parentCommentId: generateTarget.parentCommentId,
+        topic: generateTopic || undefined,
+      })
+      setGenerateTarget(null)
+      setGenerateTopic('')
+      await reloadComments()
+    } catch (caught) {
+      setGenerateError(caught instanceof Error ? caught.message : '댓글 생성에 실패했습니다.')
+    } finally {
+      setGeneratingComment(false)
+    }
+  }
+
+  const generateForm = generateTarget ? (
+    <form className="stack form-stack" onSubmit={submitGeneratedComment}>
+      {!availableCharacters.length ? (
+        <EmptyState title="사용 가능한 캐릭터가 없습니다" description="이 커뮤니티에 활성화된 내 캐릭터가 필요합니다." />
+      ) : (
+        <>
+          <label className="field">
+            <span className="field-label">캐릭터</span>
+            <select
+              className="field-input"
+              value={generateCharacterId}
+              onChange={(event) => setGenerateCharacterId(Number(event.target.value))}
+              required
+            >
+              {availableCharacters.map((character) => (
+                <option key={character.id} value={character.id}>
+                  {character.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span className="field-label">추가 주제</span>
+            <input
+              className="field-input"
+              value={generateTopic}
+              onChange={(event) => setGenerateTopic(event.target.value)}
+              placeholder="선택 사항"
+            />
+          </label>
+          {generateError ? <ErrorBlock message={generateError} /> : null}
+          <div className="row-side">
+            <button className="gnb-btn" type="button" onClick={() => setGenerateTarget(null)}>
+              취소
+            </button>
+            <button className="primary-btn" disabled={generatingComment} type="submit">
+              {generatingComment ? '생성 중...' : generateTarget.type === 'reply' ? '대댓글 생성' : '댓글 생성'}
+            </button>
+          </div>
+        </>
+      )}
+    </form>
+  ) : null
 
   return (
     <AppFrame
@@ -302,8 +410,16 @@ export function PostDetailPage() {
                 </div>
               )}
             </section>
-            <SectionCard title={`댓글 ${comments.length}`}>
+            <SectionCard
+              title={`댓글 ${comments.length}`}
+              action={
+                <button className="primary-btn" onClick={() => openGenerateForm(null)} type="button">
+                  댓글 생성
+                </button>
+              }
+            >
               {commentError ? <ErrorBlock message={commentError} /> : null}
+              {generateTarget?.type === 'comment' ? generateForm : null}
               {!commentError && !comments.length ? (
                 <EmptyState title="댓글이 없습니다" description="AI 캐릭터들의 대화는 여기에 이어집니다." />
               ) : null}
@@ -324,6 +440,10 @@ export function PostDetailPage() {
                             void commentApi.vote(thread.id, type)
                           }}
                         />
+                        <button className="gnb-btn" onClick={() => openGenerateForm(thread.id)} type="button">
+                          대댓글 생성
+                        </button>
+                        {generateTarget?.type === 'reply' && generateTarget.parentCommentId === thread.id ? generateForm : null}
                       </div>
                     </div>
                     {thread.replies.length > 0 && (
@@ -341,6 +461,10 @@ export function PostDetailPage() {
                                 </div>
                                 <MetaLine items={[formatDateTime(reply.createdAt)]} />
                                 <p className="comment-body">{reply.content}</p>
+                                <button className="gnb-btn" onClick={() => openGenerateForm(reply.id)} type="button">
+                                  대댓글 생성
+                                </button>
+                                {generateTarget?.type === 'reply' && generateTarget.parentCommentId === reply.id ? generateForm : null}
                               </div>
                             </div>
                           </div>
@@ -653,6 +777,9 @@ export function CharacterDetailPage() {
                 </Link>
                 <Link className="gnb-btn" to={`/characters/${character.id}/manual-generate`}>
                   글 수동 생성
+                </Link>
+                <Link className="gnb-btn" to={`/characters/${character.id}/manual-comment-generate`}>
+                  댓글 수동 생성
                 </Link>
                 <Link className="gnb-btn primary" to={`/characters/${character.id}/prompts`}>
                   프롬프트
@@ -994,6 +1121,143 @@ export function CharacterManualGeneratePage() {
                 </label>
                 <button className="primary-btn" disabled={submitting} type="submit">
                   글 수동 생성
+                </button>
+              </form>
+            </SectionCard>
+          </>
+        ) : null}
+      </div>
+    </AppFrame>
+  )
+}
+
+export function CharacterManualCommentGeneratePage() {
+  const params = useParams()
+  const navigate = useNavigate()
+  const characterId = Number(params.characterId)
+  const [context, setContext] = useState<Awaited<ReturnType<typeof characterApi.getGenerateContext>> | null>(null)
+  const [posts, setPosts] = useState<PostListItem[]>([])
+  const [selectedPostId, setSelectedPostId] = useState<number | ''>('')
+  const [topic, setTopic] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setLoading(true)
+        setError('')
+        const detail = await characterApi.detail(characterId)
+        const [generateContext, postResponse] = await Promise.all([
+          characterApi.getGenerateContext(characterId),
+          postApi.listByCommunity(detail.community.id, { page: 0, size: 50, sort: 'latest' }),
+        ])
+        setContext(generateContext)
+        setPosts(postResponse.posts)
+        setSelectedPostId((current) => current || postResponse.posts[0]?.id || '')
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : '프롬프트 정보를 불러오지 못했습니다.')
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [characterId])
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!selectedPostId) {
+      setError('댓글을 작성할 글을 선택해주세요.')
+      return
+    }
+    try {
+      setSubmitting(true)
+      setError('')
+      await characterApi.manualGenerateComment(characterId, {
+        postId: Number(selectedPostId),
+        topic: topic || undefined,
+      })
+      navigate(`/posts/${selectedPostId}`)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '임시 댓글 생성에 실패했습니다.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const selectedPost = posts.find((post) => post.id === selectedPostId) ?? null
+
+  return (
+    <AppFrame communities={[]}>
+      <div className="stack wide-stack">
+        <div className="feed-head">
+          <div>
+            <h1 className="page-title">댓글 수동 생성</h1>
+            <p className="page-subtitle">활성 프롬프트와 선택한 글 내용을 함께 반영해 해당 글에 어울리는 댓글을 생성합니다.</p>
+          </div>
+        </div>
+        {loading ? <LoadingBlock /> : null}
+        {error ? <ErrorBlock message={error} /> : null}
+        {!loading && context ? (
+          <>
+            {context.sections.map((section) => (
+              <SectionCard key={section.key} title={section.title}>
+                {!section.prompts.length ? (
+                  <EmptyState title="활성 프롬프트가 없습니다" description="이 구간은 현재 생성에 반영되지 않습니다." />
+                ) : (
+                  <div className="list">
+                    {section.prompts.map((prompt) => (
+                      <div className="list-row stacked" key={prompt.id}>
+                        <div className="row-top">
+                          <div className="row-title">{prompt.title}</div>
+                          <div className="row-side">
+                            <span className={`badge ${prompt.isActive ? 'active' : ''}`}>{prompt.isActive ? '활성' : '비활성'}</span>
+                            <span className="badge neutral">sort {prompt.sortOrder}</span>
+                          </div>
+                        </div>
+                        <div className="prompt-preview">{prompt.content}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
+            ))}
+            <SectionCard title="댓글 생성">
+              <form className="stack form-stack" onSubmit={onSubmit}>
+                <label className="field">
+                  <span className="field-label">주제</span>
+                  <input className="field-input" value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="선택 입력" />
+                </label>
+                <label className="field">
+                  <span className="field-label">댓글을 작성할 글</span>
+                  <select
+                    className="field-input"
+                    value={selectedPostId}
+                    onChange={(event) => setSelectedPostId(event.target.value ? Number(event.target.value) : '')}
+                    required
+                  >
+                    <option value="">글을 선택하세요</option>
+                    {posts.map((post) => (
+                      <option key={post.id} value={post.id}>
+                        {post.character.name} · {post.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {!posts.length ? (
+                  <EmptyState title="선택할 글이 없습니다" description="이 커뮤니티에 먼저 글이 있어야 댓글을 생성할 수 있습니다." />
+                ) : null}
+                {selectedPost ? (
+                  <div className="list-row stacked">
+                    <div className="row-top">
+                      <div className="row-title serif">{selectedPost.title}</div>
+                      <MetaLine items={[selectedPost.community.name, selectedPost.character.name, formatDateTime(selectedPost.createdAt)]} />
+                    </div>
+                    <div className="prompt-preview">{selectedPost.content}</div>
+                  </div>
+                ) : null}
+                <button className="primary-btn" disabled={submitting || !posts.length || !selectedPostId} type="submit">
+                  댓글 수동 생성
                 </button>
               </form>
             </SectionCard>
