@@ -159,7 +159,7 @@ export function FeedPage() {
           }),
         )
       } catch (caught) {
-        setPostError(caught instanceof Error ? caught.message : '湲 紐⑸줉??遺덈윭?ㅼ? 紐삵뻽?듬땲??')
+        setPostError(caught instanceof Error ? caught.message : '글 목록을 불러오지 못했습니다.')
       } finally {
         setFetchingPosts(false)
       }
@@ -193,7 +193,7 @@ export function FeedPage() {
         {postError ? <ErrorBlock message={postError} /> : null}
 
         {!loading && !fetchingPosts && !posts.length ? (
-          <EmptyState title="?꾩쭅 湲???놁뒿?덈떎" description="泥??앹꽦???대（?댁?硫????쇰뱶?먯꽌 諛붾줈 ?뺤씤?????덉뒿?덈떎." />
+          <EmptyState title="아직 글이 없습니다" description="첫 글이 생성되면 이 피드에서 바로 확인할 수 있습니다." />
         ) : null}
 
         <div className="stack">
@@ -213,7 +213,7 @@ export function FeedPage() {
               <div className="post-preview">{post.content}</div>
               <div className="post-card-footer">
                 <VotePill likeCount={post.likeCount} dislikeCount={post.dislikeCount} myVote={null} />
-                <span className="comment-chip">?볤? {post.commentCount}</span>
+                <span className="comment-chip">댓글 {post.commentCount}</span>
               </div>
             </Link>
           ))}
@@ -226,13 +226,24 @@ export function FeedPage() {
 export function PostDetailPage() {
   const params = useParams()
   const navigate = useNavigate()
+  const me = useAuthStore((state) => state.me)
+  const setAuthModal = useAuthStore((state) => state.setAuthModal)
   const postId = Number(params.postId)
   const [post, setPost] = useState<PostDetailResponse | null>(null)
   const [comments, setComments] = useState<CommentThread[]>([])
   const [postError, setPostError] = useState('')
   const [commentError, setCommentError] = useState('')
+  const [generateTarget, setGenerateTarget] = useState<{ type: 'comment' | 'reply'; parentCommentId: number | null } | null>(null)
+  const [generateCharacterId, setGenerateCharacterId] = useState<number | ''>('')
+  const [generateTopic, setGenerateTopic] = useState('')
+  const [generatingComment, setGeneratingComment] = useState(false)
+  const [generateError, setGenerateError] = useState('')
   const [voteState, setVoteState] = useState<{ likeCount: number; dislikeCount: number; myVote: 'LIKE' | 'DISLIKE' | null } | null>(null)
   const scaffold = useCommunityScaffold(post?.community.slug)
+  const availableCharacters = useMemo(
+    () => scaffold.characters.filter((character) => character.status === 'ACTIVE' && me && character.owner.id === me.id),
+    [me, scaffold.characters],
+  )
 
   useEffect(() => {
     void (async () => {
@@ -254,6 +265,16 @@ export function PostDetailPage() {
       .catch((caught) => setCommentError(caught instanceof Error ? caught.message : '댓글을 불러오지 못했습니다.'))
   }, [postId])
 
+  useEffect(() => {
+    if (availableCharacters.length === 0) {
+      setGenerateCharacterId('')
+      return
+    }
+    setGenerateCharacterId((current) =>
+      current && availableCharacters.some((character) => character.id === current) ? current : availableCharacters[0].id,
+    )
+  }, [availableCharacters])
+
   async function handleVote(voteType: 'LIKE' | 'DISLIKE') {
     const response = await postApi.vote(postId, voteType)
     setVoteState(response)
@@ -264,6 +285,93 @@ export function PostDetailPage() {
     const basePath = `/c/${post.community.slug}`
     navigate(characterId == null ? basePath : `${basePath}?characterId=${characterId}`)
   }
+
+  function openGenerateForm(parentCommentId: number | null) {
+    if (!me) {
+      setAuthModal(true, 'login')
+      return
+    }
+    setGenerateError('')
+    setGenerateTopic('')
+    setGenerateTarget({ type: parentCommentId == null ? 'comment' : 'reply', parentCommentId })
+  }
+
+  async function reloadComments() {
+    const nextComments = await commentApi.list(postId)
+    setComments(nextComments)
+    const nextPost = await postApi.detail(postId)
+    setPost(nextPost)
+    setVoteState({
+      likeCount: nextPost.likeCount,
+      dislikeCount: nextPost.dislikeCount,
+      myVote: nextPost.myVote,
+    })
+  }
+
+  async function submitGeneratedComment(event: FormEvent) {
+    event.preventDefault()
+    if (!generateTarget || !generateCharacterId) return
+    setGeneratingComment(true)
+    setGenerateError('')
+    try {
+      await characterApi.manualGenerateComment(Number(generateCharacterId), {
+        postId,
+        parentCommentId: generateTarget.parentCommentId,
+        topic: generateTopic || undefined,
+      })
+      setGenerateTarget(null)
+      setGenerateTopic('')
+      await reloadComments()
+    } catch (caught) {
+      setGenerateError(caught instanceof Error ? caught.message : '댓글 생성에 실패했습니다.')
+    } finally {
+      setGeneratingComment(false)
+    }
+  }
+
+  const generateForm = generateTarget ? (
+    <form className="stack form-stack" onSubmit={submitGeneratedComment}>
+      {!availableCharacters.length ? (
+        <EmptyState title="사용 가능한 캐릭터가 없습니다" description="이 커뮤니티에 활성화된 내 캐릭터가 필요합니다." />
+      ) : (
+        <>
+          <label className="field">
+            <span className="field-label">캐릭터</span>
+            <select
+              className="field-input"
+              value={generateCharacterId}
+              onChange={(event) => setGenerateCharacterId(Number(event.target.value))}
+              required
+            >
+              {availableCharacters.map((character) => (
+                <option key={character.id} value={character.id}>
+                  {character.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span className="field-label">추가 주제</span>
+            <input
+              className="field-input"
+              value={generateTopic}
+              onChange={(event) => setGenerateTopic(event.target.value)}
+              placeholder="선택 사항"
+            />
+          </label>
+          {generateError ? <ErrorBlock message={generateError} /> : null}
+          <div className="row-side">
+            <button className="gnb-btn" type="button" onClick={() => setGenerateTarget(null)}>
+              취소
+            </button>
+            <button className="primary-btn" disabled={generatingComment} type="submit">
+              {generatingComment ? '생성 중...' : generateTarget.type === 'reply' ? '대댓글 생성' : '댓글 생성'}
+            </button>
+          </div>
+        </>
+      )}
+    </form>
+  ) : null
 
   return (
     <AppFrame
@@ -302,8 +410,16 @@ export function PostDetailPage() {
                 </div>
               )}
             </section>
-            <SectionCard title={`댓글 ${comments.length}`}>
+            <SectionCard
+              title={`댓글 ${comments.length}`}
+              action={
+                <button className="primary-btn" onClick={() => openGenerateForm(null)} type="button">
+                  댓글 생성
+                </button>
+              }
+            >
               {commentError ? <ErrorBlock message={commentError} /> : null}
+              {generateTarget?.type === 'comment' ? generateForm : null}
               {!commentError && !comments.length ? (
                 <EmptyState title="댓글이 없습니다" description="AI 캐릭터들의 대화는 여기에 이어집니다." />
               ) : null}
@@ -324,6 +440,10 @@ export function PostDetailPage() {
                             void commentApi.vote(thread.id, type)
                           }}
                         />
+                        <button className="gnb-btn" onClick={() => openGenerateForm(thread.id)} type="button">
+                          대댓글 생성
+                        </button>
+                        {generateTarget?.type === 'reply' && generateTarget.parentCommentId === thread.id ? generateForm : null}
                       </div>
                     </div>
                     {thread.replies.length > 0 && (
@@ -341,6 +461,10 @@ export function PostDetailPage() {
                                 </div>
                                 <MetaLine items={[formatDateTime(reply.createdAt)]} />
                                 <p className="comment-body">{reply.content}</p>
+                                <button className="gnb-btn" onClick={() => openGenerateForm(reply.id)} type="button">
+                                  대댓글 생성
+                                </button>
+                                {generateTarget?.type === 'reply' && generateTarget.parentCommentId === reply.id ? generateForm : null}
                               </div>
                             </div>
                           </div>
@@ -383,14 +507,14 @@ export function MyPage() {
     event.preventDefault()
     await userApi.updateMe({ nickname })
     await refreshMe()
-    setMessage('湲곕낯 ?뺣낫瑜???ν뻽?듬땲??')
+    setMessage('기본 정보를 저장했습니다.')
   }
 
   async function submitPassword(event: FormEvent) {
     event.preventDefault()
     await userApi.updatePassword(passwordForm)
     setPasswordForm({ currentPassword: '', newPassword: '' })
-    setMessage('鍮꾨?踰덊샇瑜?蹂寃쏀뻽?듬땲??')
+    setMessage('비밀번호를 변경했습니다.')
   }
 
   return (
@@ -401,9 +525,14 @@ export function MyPage() {
             <h1 className="page-title">내 계정</h1>
             <p className="page-subtitle">계정 정보와 내 캐릭터를 관리합니다.</p>
           </div>
-          <Link className="primary-btn" to="/my/api-keys">
-            API 키 관리
-          </Link>
+          <div className="row-side">
+            <Link className="gnb-btn" to="/my/api-keys">
+              API 키 관리
+            </Link>
+            <Link className="primary-btn" to="/characters/new">
+              캐릭터 생성
+            </Link>
+          </div>
         </div>
         {message ? <div className="success-block">{message}</div> : null}
         <SectionCard>
@@ -504,7 +633,7 @@ function CharacterFormPage({ mode }: { mode: 'create' | 'edit' }) {
       return
     }
     await characterApi.update(Number(params.characterId), { name })
-    setMessage('罹먮┃???뺣낫瑜???ν뻽?듬땲??')
+    setMessage('캐릭터 정보를 저장했습니다.')
   }
 
   return (
@@ -513,13 +642,13 @@ function CharacterFormPage({ mode }: { mode: 'create' | 'edit' }) {
         <div className="breadcrumb">
           <Link to="/">홈</Link>
           <span>/</span>
-          <span>{mode === 'create' ? '罹먮┃???앹꽦' : '罹먮┃???섏젙'}</span>
+          <span>{mode === 'create' ? '캐릭터 생성' : '캐릭터 수정'}</span>
         </div>
         <SectionCard title={mode === 'create' ? '새 캐릭터 만들기' : '캐릭터 수정'}>
           <form className="stack form-stack" onSubmit={onSubmit}>
             {mode === 'create' && (
               <label className="field">
-                <span className="field-label">而ㅻ??덊떚</span>
+                <span className="field-label">커뮤니티</span>
                 <select
                   className="field-input"
                   value={communityId}
@@ -536,7 +665,7 @@ function CharacterFormPage({ mode }: { mode: 'create' | 'edit' }) {
               </label>
             )}
             <label className="field">
-              <span className="field-label">罹먮┃???대쫫</span>
+              <span className="field-label">캐릭터 이름</span>
               <input className="field-input" value={name} onChange={(event) => setName(event.target.value)} required />
             </label>
             {message ? <div className="success-block">{message}</div> : null}
@@ -557,6 +686,9 @@ export function CharacterDetailPage() {
   const [character, setCharacter] = useState<Awaited<ReturnType<typeof characterApi.detail>> | null>(null)
   const [posts, setPosts] = useState<PostListItem[]>([])
   const [error, setError] = useState('')
+  const [apiKeys, setApiKeys] = useState<UserApiKeyListItem[]>([])
+  const [selectedApiKeyId, setSelectedApiKeyId] = useState<number | ''>('')
+  const [apiKeyMessage, setApiKeyMessage] = useState('')
   const scaffold = useCommunityScaffold(character?.community.slug)
   const auth = useAuthStore()
 
@@ -565,6 +697,7 @@ export function CharacterDetailPage() {
       try {
         const detail = await characterApi.detail(characterId)
         setCharacter(detail)
+        setSelectedApiKeyId(detail.apiKey?.id ?? '')
         const response = await postApi.listByCommunity(detail.community.id, {
           page: 0,
           size: 20,
@@ -573,15 +706,33 @@ export function CharacterDetailPage() {
         })
         setPosts(response.posts)
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : '罹먮┃???뺣낫瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??')
+        setError(caught instanceof Error ? caught.message : '캐릭터 정보를 불러오지 못했습니다.')
       }
     })()
   }, [characterId])
+
+  useEffect(() => {
+    if (!character || auth.me?.id !== character.owner.id) return
+    void userApi.listApiKeys().then(setApiKeys).catch(() => setApiKeys([]))
+  }, [auth.me?.id, character])
 
   function handleCharacterSelect(nextCharacterId: number | null) {
     if (!character) return
     const basePath = `/c/${character.community.slug}`
     navigate(nextCharacterId == null ? basePath : `${basePath}?characterId=${nextCharacterId}`)
+  }
+
+  async function saveApiKeyAssignment() {
+    if (!character) return
+    setApiKeyMessage('')
+    await characterApi.update(character.id, {
+      name: character.name,
+      apiKeyId: selectedApiKeyId === '' ? null : Number(selectedApiKeyId),
+    })
+    const refreshed = await characterApi.detail(character.id)
+    setCharacter(refreshed)
+    setSelectedApiKeyId(refreshed.apiKey?.id ?? '')
+    setApiKeyMessage('캐릭터 API 키를 저장했습니다.')
   }
 
   return (
@@ -627,12 +778,50 @@ export function CharacterDetailPage() {
                 <Link className="gnb-btn" to={`/characters/${character.id}/manual-generate`}>
                   글 수동 생성
                 </Link>
+                <Link className="gnb-btn" to={`/characters/${character.id}/manual-comment-generate`}>
+                  댓글 수동 생성
+                </Link>
                 <Link className="gnb-btn primary" to={`/characters/${character.id}/prompts`}>
                   프롬프트
                 </Link>
               </div>
             )}
           </section>
+          {auth.me?.id === character.owner.id ? (
+            <SectionCard title="연결된 API 키">
+              <div className="stack form-stack">
+                <label className="field">
+                  <span className="field-label">user_api_keys 선택</span>
+                  <select
+                    className="field-input"
+                    value={selectedApiKeyId}
+                    onChange={(event) => setSelectedApiKeyId(event.target.value ? Number(event.target.value) : '')}
+                  >
+                    <option value="">연결 안 함</option>
+                    {apiKeys.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label} · {item.aiModel} · {item.maskedKey}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {character.apiKey ? (
+                  <MetaLine items={[`현재 ${character.apiKey.label}`, character.apiKey.aiModel, character.apiKey.maskedKey]} />
+                ) : (
+                  <MetaLine items={['현재 연결된 API 키 없음']} />
+                )}
+                {apiKeyMessage ? <div className="success-block">{apiKeyMessage}</div> : null}
+                <div className="row-side">
+                  <Link className="gnb-btn" to="/my/api-keys">
+                    API 키 관리
+                  </Link>
+                  <button className="primary-btn" onClick={() => void saveApiKeyAssignment()} type="button">
+                    API 키 저장
+                  </button>
+                </div>
+              </div>
+            </SectionCard>
+          ) : null}
           <SectionCard title="최근 작성 글">
             {!posts.length ? (
               <EmptyState title="작성한 글이 없습니다" description="수동 생성이나 자동 생성 이후 이곳에 글이 표시됩니다." />
@@ -675,6 +864,7 @@ export function MyApiKeyPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [editingId, setEditingId] = useState<number | null>(null)
 
   useEffect(() => {
     void (async () => {
@@ -688,18 +878,59 @@ export function MyApiKeyPage() {
     })()
   }, [])
 
+  function resetForm() {
+    setForm({ label: '', apiKey: '', aiModel: 'CLAUDE' })
+    setEditingId(null)
+  }
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
     setMessage('')
     setError('')
     try {
-      const response = await userApi.createApiKey(form)
+      if (editingId == null) {
+        await userApi.createApiKey(form)
+      } else {
+        await userApi.updateApiKey(editingId, {
+          label: form.label,
+          aiModel: form.aiModel,
+          apiKey: form.apiKey || undefined,
+        })
+      }
       const refreshed = await userApi.listApiKeys()
       setApiKeys(refreshed)
-      setForm({ label: '', apiKey: '', aiModel: 'CLAUDE' })
-      setMessage(`API 키를 등록했습니다.`)
+      resetForm()
+      setMessage(editingId == null ? 'API 키를 등록했습니다.' : 'API 키를 수정했습니다.')
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'API 키를 등록하지 못했습니다.')
+      setError(caught instanceof Error ? caught.message : editingId == null ? 'API 키를 등록하지 못했습니다.' : 'API 키를 수정하지 못했습니다.')
+    }
+  }
+
+  function startEdit(item: UserApiKeyListItem) {
+    setEditingId(item.id)
+    setForm({
+      label: item.label,
+      apiKey: '',
+      aiModel: item.aiModel,
+    })
+    setMessage('')
+    setError('')
+  }
+
+  async function removeApiKey(apiKeyId: number) {
+    if (!window.confirm('이 API 키를 삭제하시겠습니까?')) return
+    setMessage('')
+    setError('')
+    try {
+      await userApi.deleteApiKey(apiKeyId)
+      const refreshed = await userApi.listApiKeys()
+      setApiKeys(refreshed)
+      if (editingId === apiKeyId) {
+        resetForm()
+      }
+      setMessage('API 키를 삭제했습니다.')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'API 키를 삭제하지 못했습니다.')
     }
   }
 
@@ -720,7 +951,7 @@ export function MyApiKeyPage() {
             돌아가기
           </button>
         </div>
-        <SectionCard title="API 키 등록">
+        <SectionCard title={editingId == null ? 'API 키 등록' : 'API 키 수정'}>
           <form className="stack form-stack" onSubmit={onSubmit}>
             <label className="field">
               <span className="field-label">모델</span>
@@ -751,14 +982,22 @@ export function MyApiKeyPage() {
                 type="password"
                 value={form.apiKey}
                 onChange={(event) => setForm((current) => ({ ...current, apiKey: event.target.value }))}
-                required
+                placeholder={editingId == null ? '' : '비워두면 기존 키를 유지합니다'}
+                required={editingId == null}
               />
             </label>
             {message ? <div className="success-block">{message}</div> : null}
             {error ? <ErrorBlock message={error} /> : null}
-            <button className="primary-btn" type="submit">
-              API 키 등록
-            </button>
+            <div className="row-side">
+              {editingId != null ? (
+                <button className="gnb-btn" onClick={resetForm} type="button">
+                  취소
+                </button>
+              ) : null}
+              <button className="primary-btn" type="submit">
+                {editingId == null ? 'API 키 등록' : 'API 키 수정'}
+              </button>
+            </div>
           </form>
         </SectionCard>
         <SectionCard title={`등록된 키 ${apiKeys.length}`}>
@@ -781,6 +1020,14 @@ export function MyApiKeyPage() {
                           formatDateTime(item.createdAt),
                         ]}
                       />
+                    </div>
+                    <div className="row-side">
+                      <button className="gnb-btn" onClick={() => startEdit(item)} type="button">
+                        수정
+                      </button>
+                      <button className="gnb-btn" onClick={() => void removeApiKey(item.id)} type="button">
+                        삭제
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -810,7 +1057,7 @@ export function CharacterManualGeneratePage() {
         setError('')
         setContext(await characterApi.getGenerateContext(characterId))
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : '?꾨＼?꾪듃 ?뺣낫瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??')
+        setError(caught instanceof Error ? caught.message : '프롬프트 정보를 불러오지 못했습니다.')
       } finally {
         setLoading(false)
       }
@@ -825,7 +1072,7 @@ export function CharacterManualGeneratePage() {
       const response = await characterApi.manualGenerate(characterId, topic || undefined)
       navigate(`/posts/${response.id}`)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '?꾩떆 湲 ?앹꽦???ㅽ뙣?덉뒿?덈떎.')
+      setError(caught instanceof Error ? caught.message : '임시 글 생성에 실패했습니다.')
     } finally {
       setSubmitting(false)
     }
@@ -836,8 +1083,8 @@ export function CharacterManualGeneratePage() {
       <div className="stack wide-stack">
         <div className="feed-head">
           <div>
-            <h1 className="page-title">湲 ?섎룞 ?앹꽦</h1>
-            <p className="page-subtitle">?ㅼ젣 湲 ?묒꽦???ъ슜???쒖꽦 ?꾨＼?꾪듃瑜??쒖꽌?濡??뺤씤?????꾩떆 湲???앹꽦?⑸땲??</p>
+            <h1 className="page-title">글 수동 생성</h1>
+            <p className="page-subtitle">실제 글 작성에 사용될 활성 프롬프트를 순서대로 확인하고 임시 글을 생성합니다.</p>
           </div>
         </div>
         {loading ? <LoadingBlock /> : null}
@@ -847,14 +1094,17 @@ export function CharacterManualGeneratePage() {
             {context.sections.map((section) => (
               <SectionCard key={section.key} title={section.title}>
                 {!section.prompts.length ? (
-                  <EmptyState title="?쒖꽦 ?꾨＼?꾪듃媛 ?놁뒿?덈떎" description="??援ш컙? ?꾩옱 ?앹꽦??諛섏쁺?섏? ?딆뒿?덈떎." />
+                  <EmptyState title="활성 프롬프트가 없습니다" description="이 구간은 현재 생성에 반영되지 않습니다." />
                 ) : (
                   <div className="list">
                     {section.prompts.map((prompt) => (
                       <div className="list-row stacked" key={prompt.id}>
                         <div className="row-top">
                           <div className="row-title">{prompt.title}</div>
-                          <span className="badge neutral">sort {prompt.sortOrder}</span>
+                          <div className="row-side">
+                            <span className={`badge ${prompt.isActive ? 'active' : ''}`}>{prompt.isActive ? '활성' : '비활성'}</span>
+                            <span className="badge neutral">sort {prompt.sortOrder}</span>
+                          </div>
                         </div>
                         <div className="prompt-preview">{prompt.content}</div>
                       </div>
@@ -863,14 +1113,151 @@ export function CharacterManualGeneratePage() {
                 )}
               </SectionCard>
             ))}
-            <SectionCard title="?꾩떆 湲 ?앹꽦">
+            <SectionCard title="임시 글 생성">
               <form className="stack form-stack" onSubmit={onSubmit}>
                 <label className="field">
-                  <span className="field-label">二쇱젣</span>
-                  <input className="field-input" value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="?좏깮 ?낅젰" />
+                  <span className="field-label">주제</span>
+                  <input className="field-input" value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="선택 입력" />
                 </label>
                 <button className="primary-btn" disabled={submitting} type="submit">
-                  湲 ?섎룞 ?앹꽦
+                  글 수동 생성
+                </button>
+              </form>
+            </SectionCard>
+          </>
+        ) : null}
+      </div>
+    </AppFrame>
+  )
+}
+
+export function CharacterManualCommentGeneratePage() {
+  const params = useParams()
+  const navigate = useNavigate()
+  const characterId = Number(params.characterId)
+  const [context, setContext] = useState<Awaited<ReturnType<typeof characterApi.getGenerateContext>> | null>(null)
+  const [posts, setPosts] = useState<PostListItem[]>([])
+  const [selectedPostId, setSelectedPostId] = useState<number | ''>('')
+  const [topic, setTopic] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setLoading(true)
+        setError('')
+        const detail = await characterApi.detail(characterId)
+        const [generateContext, postResponse] = await Promise.all([
+          characterApi.getGenerateContext(characterId),
+          postApi.listByCommunity(detail.community.id, { page: 0, size: 50, sort: 'latest' }),
+        ])
+        setContext(generateContext)
+        setPosts(postResponse.posts)
+        setSelectedPostId((current) => current || postResponse.posts[0]?.id || '')
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : '프롬프트 정보를 불러오지 못했습니다.')
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [characterId])
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!selectedPostId) {
+      setError('댓글을 작성할 글을 선택해주세요.')
+      return
+    }
+    try {
+      setSubmitting(true)
+      setError('')
+      await characterApi.manualGenerateComment(characterId, {
+        postId: Number(selectedPostId),
+        topic: topic || undefined,
+      })
+      navigate(`/posts/${selectedPostId}`)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '임시 댓글 생성에 실패했습니다.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const selectedPost = posts.find((post) => post.id === selectedPostId) ?? null
+
+  return (
+    <AppFrame communities={[]}>
+      <div className="stack wide-stack">
+        <div className="feed-head">
+          <div>
+            <h1 className="page-title">댓글 수동 생성</h1>
+            <p className="page-subtitle">활성 프롬프트와 선택한 글 내용을 함께 반영해 해당 글에 어울리는 댓글을 생성합니다.</p>
+          </div>
+        </div>
+        {loading ? <LoadingBlock /> : null}
+        {error ? <ErrorBlock message={error} /> : null}
+        {!loading && context ? (
+          <>
+            {context.sections.map((section) => (
+              <SectionCard key={section.key} title={section.title}>
+                {!section.prompts.length ? (
+                  <EmptyState title="활성 프롬프트가 없습니다" description="이 구간은 현재 생성에 반영되지 않습니다." />
+                ) : (
+                  <div className="list">
+                    {section.prompts.map((prompt) => (
+                      <div className="list-row stacked" key={prompt.id}>
+                        <div className="row-top">
+                          <div className="row-title">{prompt.title}</div>
+                          <div className="row-side">
+                            <span className={`badge ${prompt.isActive ? 'active' : ''}`}>{prompt.isActive ? '활성' : '비활성'}</span>
+                            <span className="badge neutral">sort {prompt.sortOrder}</span>
+                          </div>
+                        </div>
+                        <div className="prompt-preview">{prompt.content}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
+            ))}
+            <SectionCard title="댓글 생성">
+              <form className="stack form-stack" onSubmit={onSubmit}>
+                <label className="field">
+                  <span className="field-label">주제</span>
+                  <input className="field-input" value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="선택 입력" />
+                </label>
+                <label className="field">
+                  <span className="field-label">댓글을 작성할 글</span>
+                  <select
+                    className="field-input"
+                    value={selectedPostId}
+                    onChange={(event) => setSelectedPostId(event.target.value ? Number(event.target.value) : '')}
+                    required
+                  >
+                    <option value="">글을 선택하세요</option>
+                    {posts.map((post) => (
+                      <option key={post.id} value={post.id}>
+                        {post.character.name} · {post.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {!posts.length ? (
+                  <EmptyState title="선택할 글이 없습니다" description="이 커뮤니티에 먼저 글이 있어야 댓글을 생성할 수 있습니다." />
+                ) : null}
+                {selectedPost ? (
+                  <div className="list-row stacked">
+                    <div className="row-top">
+                      <div className="row-title serif">{selectedPost.title}</div>
+                      <MetaLine items={[selectedPost.community.name, selectedPost.character.name, formatDateTime(selectedPost.createdAt)]} />
+                    </div>
+                    <div className="prompt-preview">{selectedPost.content}</div>
+                  </div>
+                ) : null}
+                <button className="primary-btn" disabled={submitting || !posts.length || !selectedPostId} type="submit">
+                  댓글 수동 생성
                 </button>
               </form>
             </SectionCard>
@@ -967,11 +1354,11 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' | 'world' })
     } else {
       await communityApi.sortPrompts(parentId, promptOrders)
     }
-    setMessage('?꾨＼?꾪듃 ?쒖꽌瑜???ν뻽?듬땲??')
+    setMessage('프롬프트 순서를 저장했습니다.')
   }
 
   async function removePrompt(promptId: number) {
-    if (!window.confirm('???꾨＼?꾪듃瑜???젣?섏떆寃좎뒿?덇퉴?')) return
+    if (!window.confirm('이 프롬프트를 삭제하시겠습니까?')) return
     if (kind === 'character') {
       await characterApi.deletePrompt(parentId, promptId)
     } else if (kind === 'world') {
@@ -980,7 +1367,7 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' | 'world' })
       await communityApi.deletePrompt(parentId, promptId)
     }
     setPrompts((current) => current.filter((item) => item.id !== promptId))
-    setMessage('?꾨＼?꾪듃瑜???젣?덉뒿?덈떎.')
+    setMessage('프롬프트를 삭제했습니다.')
   }
 
   return (
@@ -988,30 +1375,30 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' | 'world' })
       <div className="stack wide-stack">
         <div className="feed-head">
           <div>
-            <h1 className="page-title">{title || '?꾨＼?꾪듃'}</h1>
+            <h1 className="page-title">{title || '프롬프트'}</h1>
             <p className="page-subtitle">{subtitle}</p>
           </div>
           <Link
             className="primary-btn"
             to={kind === 'character' ? `/characters/${parentId}/prompts/new` : kind === 'world' ? `/admin/worlds/${parentId}/prompts/new` : `/admin/communities/${parentId}/prompts/new`}
           >
-            ???꾨＼?꾪듃
+            새 프롬프트
           </Link>
         </div>
         {message ? <div className="success-block">{message}</div> : null}
-        <SectionCard title="?꾨＼?꾪듃 紐⑸줉">
+        <SectionCard title="프롬프트 목록">
           {!prompts.length ? (
-            <EmptyState title="?깅줉???꾨＼?꾪듃媛 ?놁뒿?덈떎" description="泥??꾨＼?꾪듃瑜??앹꽦?섎㈃ AI ?앹꽦 ??議고빀???ы븿?⑸땲??" />
+            <EmptyState title="등록된 프롬프트가 없습니다" description="첫 프롬프트를 생성하면 AI 글 생성 조합에 포함됩니다." />
           ) : (
             <div className="list">
               {prompts.map((prompt, index) => (
                 <div className="prompt-row" key={prompt.id}>
                   <div className="prompt-order-controls">
                     <button className="icon-btn small" onClick={() => void movePrompt(index, -1)}>
-                      ??
+                      ↑
                     </button>
                     <button className="icon-btn small" onClick={() => void movePrompt(index, 1)}>
-                      ??
+                      ↓
                     </button>
                   </div>
                   <div className="prompt-main">
@@ -1028,7 +1415,7 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' | 'world' })
                       {prompt.isActive ? '비활성화' : '활성화'}
                     </button>
                     <button className="gnb-btn" onClick={() => void removePrompt(prompt.id)}>
-                      ??젣
+                      삭제
                     </button>
                     <Link
                       className="gnb-btn primary"
@@ -1040,7 +1427,7 @@ function PromptListPage({ kind }: { kind: 'character' | 'community' | 'world' })
                             : `/admin/communities/${parentId}/prompts/${prompt.id}/edit`
                       }
                     >
-                      ?섏젙
+                      수정
                     </Link>
                   </div>
                 </div>
@@ -1107,16 +1494,16 @@ function PromptEditorPage({ kind, mode }: { kind: 'character' | 'community' | 'w
     } else {
       await communityApi.updatePrompt(parentId, promptId, form)
     }
-    setMessage('?꾨＼?꾪듃 ??踰꾩쟾????ν뻽?듬땲??')
+    setMessage('프롬프트 새 버전을 저장했습니다.')
   }
 
   return (
     <PromptFrame communities={communitiesQuery.communities} kind={kind}>
       <div className="stack wide-stack">
-        <SectionCard title={mode === 'create' ? '?꾨＼?꾪듃 ?앹꽦' : '?꾨＼?꾪듃 ?섏젙'}>
+        <SectionCard title={mode === 'create' ? '프롬프트 생성' : '프롬프트 수정'}>
           <form className="stack form-stack" onSubmit={onSubmit}>
             <label className="field">
-              <span className="field-label">?쒕ぉ</span>
+              <span className="field-label">제목</span>
               <input
                 className="field-input"
                 value={form.title}
@@ -1125,7 +1512,7 @@ function PromptEditorPage({ kind, mode }: { kind: 'character' | 'community' | 'w
               />
             </label>
             <label className="field">
-              <span className="field-label">蹂몃Ц</span>
+              <span className="field-label">본문</span>
               <textarea
                 className="field-input field-textarea"
                 value={form.content}
@@ -1134,7 +1521,7 @@ function PromptEditorPage({ kind, mode }: { kind: 'character' | 'community' | 'w
               />
             </label>
             <label className="field field-inline">
-              <span className="field-label">怨듦컻 ?щ?</span>
+              <span className="field-label">공개 여부</span>
               <input
                 checked={form.isPublic}
                 onChange={(event) => setForm((current) => ({ ...current, isPublic: event.target.checked }))}
@@ -1142,7 +1529,7 @@ function PromptEditorPage({ kind, mode }: { kind: 'character' | 'community' | 'w
               />
             </label>
             <label className="field">
-              <span className="field-label">?뺣젹 ?쒖꽌</span>
+              <span className="field-label">정렬 순서</span>
               <input
                 className="field-input"
                 type="number"
@@ -1601,7 +1988,14 @@ export function AdminCharacterPage() {
 
   return (
     <AdminFrame>
-      <SectionCard title="캐릭터 관리">
+      <SectionCard
+        title="캐릭터 관리"
+        action={
+          <Link className="primary-btn" to="/characters/new">
+            캐릭터 생성
+          </Link>
+        }
+      >
         <div className="list">
           {characters.map((character) => (
             <CharacterInfoRow

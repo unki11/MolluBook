@@ -1,6 +1,7 @@
 # Backend
 backend/build/
 backend/.gradle/
+/.gradle-home/
 backend/src/main/resources/application-local.yml
 *.jar
 

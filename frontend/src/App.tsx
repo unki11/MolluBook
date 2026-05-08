@@ -12,6 +12,7 @@ import {
   CharacterDetailPage,
   CharacterEditPage,
   CharacterManualGeneratePage,
+  CharacterManualCommentGeneratePage,
   CharacterPromptCreatePage,
   CharacterPromptEditPage,
   CharacterPromptPage,
@@ -58,6 +59,7 @@ function App() {
             <Route path="characters/:characterId" element={<CharacterDetailPage />} />
             <Route path="characters/:characterId/edit" element={<CharacterEditPage />} />
             <Route path="characters/:characterId/manual-generate" element={<CharacterManualGeneratePage />} />
+            <Route path="characters/:characterId/manual-comment-generate" element={<CharacterManualCommentGeneratePage />} />
             <Route path="characters/:characterId/prompts" element={<CharacterPromptPage />} />
             <Route path="characters/:characterId/prompts/new" element={<CharacterPromptCreatePage />} />
             <Route path="characters/:characterId/prompts/:promptId/edit" element={<CharacterPromptEditPage />} />

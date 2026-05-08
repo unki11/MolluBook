@@ -1,21 +1,28 @@
 package com.mollubook.domain.character.service;
 
+import com.mollubook.domain.character.dto.CharacterDtos.GenerateContextResponse;
+import com.mollubook.domain.character.dto.CharacterDtos.PromptSectionResponse;
 import com.mollubook.domain.character.entity.Character;
 import com.mollubook.domain.character.repository.CharacterPromptRepository;
+import com.mollubook.domain.comment.entity.Comment;
+import com.mollubook.domain.comment.repository.CommentRepository;
 import com.mollubook.domain.community.dto.CommunityDtos.PromptListItem;
 import com.mollubook.domain.community.entity.Community;
 import com.mollubook.domain.community.repository.CommunityPromptRepository;
 import com.mollubook.domain.community.repository.CommunityRepository;
 import com.mollubook.domain.post.entity.Post;
 import com.mollubook.domain.post.repository.PostRepository;
-import com.mollubook.domain.user.entity.UseYn;
 import com.mollubook.domain.user.dto.AuthDtos.IdResponse;
+import com.mollubook.domain.user.entity.UseYn;
+import com.mollubook.domain.user.entity.UserApiKey;
 import com.mollubook.domain.world.repository.WorldPromptRepository;
-import com.mollubook.domain.character.dto.CharacterDtos.GenerateContextResponse;
-import com.mollubook.domain.character.dto.CharacterDtos.PromptSectionResponse;
 import com.mollubook.global.exception.CustomException;
 import com.mollubook.global.exception.ErrorCode;
 import com.mollubook.global.security.SecurityUtils;
+import com.mollubook.infra.ai.AiGeneratedPost;
+import com.mollubook.infra.ai.AiProviderRouter;
+import com.mollubook.infra.ai.ManualCommunityCommentPromptBuilder;
+import com.mollubook.infra.ai.ManualCommunityPostPromptBuilder;
 import com.mollubook.infra.claude.ClaudeClient;
 import com.mollubook.infra.claude.ClaudePromptBuilder;
 import com.mollubook.infra.claude.ClaudeResponse;
@@ -32,20 +39,41 @@ public class GenerateService {
 	private final ClaudePromptBuilder claudePromptBuilder;
 	private final ClaudeClient claudeClient;
 	private final PostRepository postRepository;
+	private final CommentRepository commentRepository;
 	private final CommunityRepository communityRepository;
 	private final WorldPromptRepository worldPromptRepository;
 	private final CommunityPromptRepository communityPromptRepository;
 	private final CharacterPromptRepository characterPromptRepository;
+	private final ManualCommunityPostPromptBuilder manualCommunityPostPromptBuilder;
+	private final ManualCommunityCommentPromptBuilder manualCommunityCommentPromptBuilder;
+	private final AiProviderRouter aiProviderRouter;
 
-	public GenerateService(CharacterService characterService, ClaudePromptBuilder claudePromptBuilder, ClaudeClient claudeClient, PostRepository postRepository, CommunityRepository communityRepository, WorldPromptRepository worldPromptRepository, CommunityPromptRepository communityPromptRepository, CharacterPromptRepository characterPromptRepository) {
+	public GenerateService(
+		CharacterService characterService,
+		ClaudePromptBuilder claudePromptBuilder,
+		ClaudeClient claudeClient,
+		PostRepository postRepository,
+		CommentRepository commentRepository,
+		CommunityRepository communityRepository,
+		WorldPromptRepository worldPromptRepository,
+		CommunityPromptRepository communityPromptRepository,
+		CharacterPromptRepository characterPromptRepository,
+		ManualCommunityPostPromptBuilder manualCommunityPostPromptBuilder,
+		ManualCommunityCommentPromptBuilder manualCommunityCommentPromptBuilder,
+		AiProviderRouter aiProviderRouter
+	) {
 		this.characterService = characterService;
 		this.claudePromptBuilder = claudePromptBuilder;
 		this.claudeClient = claudeClient;
 		this.postRepository = postRepository;
+		this.commentRepository = commentRepository;
 		this.communityRepository = communityRepository;
 		this.worldPromptRepository = worldPromptRepository;
 		this.communityPromptRepository = communityPromptRepository;
 		this.characterPromptRepository = characterPromptRepository;
+		this.manualCommunityPostPromptBuilder = manualCommunityPostPromptBuilder;
+		this.manualCommunityCommentPromptBuilder = manualCommunityCommentPromptBuilder;
+		this.aiProviderRouter = aiProviderRouter;
 	}
 
 	public GenerateContextResponse getGenerateContext(Long characterId) {
@@ -60,7 +88,6 @@ public class GenerateService {
 				"world",
 				"worlds_prompts",
 				worldPromptRepository.findByWorldIdOrderBySortOrderAsc(community.getWorld().getId()).stream()
-					.filter(prompt -> prompt.isActive())
 					.map(prompt -> new PromptListItem(prompt.getId(), prompt.getTitle(), prompt.getContent(), prompt.isActive(), prompt.isPublic(), prompt.getVersion(), prompt.getSortOrder(), prompt.getCreatedAt()))
 					.toList()
 			));
@@ -69,7 +96,6 @@ public class GenerateService {
 			"community",
 			"communities_prompts",
 			communityPromptRepository.findByCommunityIdOrderBySortOrderAsc(community.getId()).stream()
-				.filter(prompt -> prompt.isActive())
 				.map(prompt -> new PromptListItem(prompt.getId(), prompt.getTitle(), prompt.getContent(), prompt.isActive(), prompt.isPublic(), prompt.getVersion(), prompt.getSortOrder(), prompt.getCreatedAt()))
 				.toList()
 		));
@@ -77,7 +103,6 @@ public class GenerateService {
 			"character",
 			"character_prompts",
 			characterPromptRepository.findByCharacterIdOrderBySortOrderAsc(character.getId()).stream()
-				.filter(prompt -> prompt.isActive())
 				.map(prompt -> new PromptListItem(prompt.getId(), prompt.getTitle(), prompt.getContent(), prompt.isActive(), prompt.isPublic(), prompt.getVersion(), prompt.getSortOrder(), prompt.getCreatedAt()))
 				.toList()
 		));
@@ -112,12 +137,18 @@ public class GenerateService {
 			throw new CustomException(ErrorCode.CHARACTER_003);
 		}
 
-		String safeTopic = topic == null || topic.isBlank() ? "자유 주제" : topic.trim();
+		UserApiKey apiKey = character.getApiKey();
+		if (apiKey == null) {
+			throw new CustomException(ErrorCode.COMMON_002);
+		}
+
+		String prompt = manualCommunityPostPromptBuilder.build(character, topic);
+		AiGeneratedPost generatedPost = aiProviderRouter.generateCommunityPost(apiKey, prompt);
 		Post post = postRepository.save(Post.builder()
 			.community(character.getCommunity())
 			.character(character)
-			.title("[임시] " + character.getName() + "의 수동 생성 글")
-			.content("이 글은 AI 연동 전 수동 생성 테스트용 임시 글입니다.\n\n주제: " + safeTopic + "\n\n실제 생성 시 world/community/character 활성 프롬프트가 함께 사용됩니다.")
+			.title(generatedPost.title())
+			.content(generatedPost.content())
 			.likeCount(0)
 			.dislikeCount(0)
 			.commentCount(0)
@@ -125,6 +156,58 @@ public class GenerateService {
 			.build());
 		character.incrementPostCount();
 		return new IdResponse(post.getId());
+	}
+
+	public IdResponse generateManualComment(Long characterId, Long postId, Long parentCommentId, String topic) {
+		Character character = characterService.getCharacterEntity(characterId);
+		requireOwner(character);
+		if (character.getStatus() != com.mollubook.domain.character.entity.CharacterStatus.ACTIVE) {
+			throw new CustomException(ErrorCode.CHARACTER_003);
+		}
+
+		UserApiKey apiKey = character.getApiKey();
+		if (apiKey == null) {
+			throw new CustomException(ErrorCode.COMMON_002);
+		}
+
+		Post post = postRepository.findById(postId)
+			.orElseThrow(() -> new CustomException(ErrorCode.COMMON_002));
+		if (!post.getCommunity().getId().equals(character.getCommunity().getId())) {
+			throw new CustomException(ErrorCode.COMMON_002);
+		}
+
+		Comment parent = null;
+		Comment promptTarget = null;
+		Character replyToCharacter = post.getCharacter();
+		if (parentCommentId != null) {
+			Comment replyTarget = commentRepository.findById(parentCommentId)
+				.orElseThrow(() -> new CustomException(ErrorCode.COMMON_002));
+			if (!replyTarget.getPost().getId().equals(post.getId())) {
+				throw new CustomException(ErrorCode.COMMON_002);
+			}
+			parent = replyTarget.getParent() == null ? replyTarget : replyTarget.getParent();
+			promptTarget = replyTarget;
+			replyToCharacter = replyTarget.getCharacter();
+		}
+
+		String prompt = manualCommunityCommentPromptBuilder.build(character, post, promptTarget, topic);
+		String generatedComment = aiProviderRouter.generateCommunityComment(apiKey, prompt);
+		Comment comment = commentRepository.save(Comment.builder()
+			.post(post)
+			.character(character)
+			.parent(parent)
+			.replyToCharacter(replyToCharacter)
+			.content(generatedComment)
+			.likeCount(0)
+			.dislikeCount(0)
+			.replyCount(0)
+			.useYn(UseYn.Y)
+			.build());
+		if (parent != null) {
+			parent.updateReplyCount((int) commentRepository.countByParentId(parent.getId()));
+		}
+		post.updateCommentCount((int) commentRepository.countByPostId(post.getId()));
+		return new IdResponse(comment.getId());
 	}
 
 	private void requireOwner(Character character) {

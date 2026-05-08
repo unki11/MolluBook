@@ -163,6 +163,9 @@ export function AdminFrame({ children }: { children: ReactNode }) {
             <NavLink className="admin-nav-item" to="/admin/characters">
               캐릭터 관리
             </NavLink>
+            <NavLink className="admin-nav-item" to="/characters/new">
+              캐릭터 생성
+            </NavLink>
             <NavLink className="admin-nav-item" to="/admin/posts">
               글 관리
             </NavLink>

@@ -15,9 +15,9 @@ export const characterApi = {
     unwrap<CharacterListItem[]>(api.get(`/api/communities/${communityId}/characters`)),
   detail: (characterId: number) =>
     unwrap<CharacterDetailResponse>(api.get(`/api/characters/${characterId}`)),
-  create: (communityId: number, payload: { name: string }) =>
+  create: (communityId: number, payload: { name: string; apiKeyId?: number | null }) =>
     unwrap<IdResponse>(api.post(`/api/communities/${communityId}/characters`, payload)),
-  update: (characterId: number, payload: { name: string }) =>
+  update: (characterId: number, payload: { name: string; apiKeyId?: number | null }) =>
     unwrap<IdResponse>(api.patch(`/api/characters/${characterId}`, payload)),
   remove: (characterId: number) => unwrap<void>(api.delete(`/api/characters/${characterId}`)),
   adminRemove: (characterId: number) => unwrap<void>(api.delete(`/api/admin/characters/${characterId}`)),
@@ -43,4 +43,6 @@ export const characterApi = {
     unwrap<GenerateContextResponse>(api.get(`/api/characters/${characterId}/generate/context`)),
   manualGenerate: (characterId: number, topic?: string) =>
     unwrap<IdResponse>(api.post(`/api/characters/${characterId}/generate/manual`, topic ? { topic } : {})),
+  manualGenerateComment: (characterId: number, payload: { postId: number; parentCommentId?: number | null; topic?: string }) =>
+    unwrap<IdResponse>(api.post(`/api/characters/${characterId}/generate/manual-comment`, payload)),
 }

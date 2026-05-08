@@ -8,6 +8,7 @@ import com.mollubook.domain.character.dto.CharacterDtos.CharacterUpdateRequest;
 import com.mollubook.domain.character.dto.CharacterDtos.CommunitySummary;
 import com.mollubook.domain.character.dto.CharacterDtos.OwnerSummary;
 import com.mollubook.domain.character.dto.CharacterDtos.WorldSummary;
+import com.mollubook.domain.character.dto.CharacterDtos.UserApiKeySummary;
 import com.mollubook.domain.character.dto.CharacterDtos.PromptActiveRequest;
 import com.mollubook.domain.character.dto.CharacterDtos.PromptOrderItem;
 import com.mollubook.domain.character.dto.CharacterDtos.PromptOrderRequest;
@@ -27,13 +28,15 @@ import com.mollubook.domain.user.dto.AuthDtos.IdResponse;
 import com.mollubook.domain.user.entity.SystemRole;
 import com.mollubook.domain.user.entity.UseYn;
 import com.mollubook.domain.user.entity.User;
+import com.mollubook.domain.user.entity.UserApiKey;
+import com.mollubook.domain.user.repository.UserApiKeyRepository;
 import com.mollubook.domain.user.repository.UserRepository;
 import com.mollubook.global.exception.CustomException;
 import com.mollubook.global.exception.ErrorCode;
 import com.mollubook.global.security.SecurityUtils;
+import com.mollubook.global.util.EncryptionUtil;
 import jakarta.transaction.Transactional;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -44,12 +47,16 @@ public class CharacterService {
 	private final CharacterPromptRepository characterPromptRepository;
 	private final CommunityService communityService;
 	private final UserRepository userRepository;
+	private final UserApiKeyRepository userApiKeyRepository;
+	private final EncryptionUtil encryptionUtil;
 
-	public CharacterService(CharacterRepository characterRepository, CharacterPromptRepository characterPromptRepository, CommunityService communityService, UserRepository userRepository) {
+	public CharacterService(CharacterRepository characterRepository, CharacterPromptRepository characterPromptRepository, CommunityService communityService, UserRepository userRepository, UserApiKeyRepository userApiKeyRepository, EncryptionUtil encryptionUtil) {
 		this.characterRepository = characterRepository;
 		this.characterPromptRepository = characterPromptRepository;
 		this.communityService = communityService;
 		this.userRepository = userRepository;
+		this.userApiKeyRepository = userApiKeyRepository;
+		this.encryptionUtil = encryptionUtil;
 	}
 
 	public List<CharacterListItem> getCharacters(Long communityId) {
@@ -68,7 +75,8 @@ public class CharacterService {
 			character.getLastPostAt(),
 			new CommunitySummary(character.getCommunity().getId(), character.getCommunity().getName(), character.getCommunity().getSlug()),
 			character.getCommunity().getWorld() == null ? null : new WorldSummary(character.getCommunity().getWorld().getId(), character.getCommunity().getWorld().getName(), character.getCommunity().getWorld().getSlug()),
-			new OwnerSummary(character.getUser().getId(), character.getUser().getNickname())
+			new OwnerSummary(character.getUser().getId(), character.getUser().getNickname()),
+			toApiKeySummary(character.getApiKey())
 		);
 	}
 
@@ -78,6 +86,7 @@ public class CharacterService {
 		Character character = characterRepository.save(Character.builder()
 			.user(user)
 			.community(community)
+			.apiKey(resolveOwnedApiKey(request.apiKeyId(), user))
 			.name(request.name())
 			.postCount(0)
 			.status(CharacterStatus.ACTIVE)
@@ -90,6 +99,7 @@ public class CharacterService {
 		Character character = getCharacterEntity(characterId);
 		requireOwner(character);
 		character.updateName(request.name());
+		character.updateApiKey(resolveOwnedApiKey(request.apiKeyId(), currentUser()));
 		return new IdResponse(character.getId());
 	}
 
@@ -143,9 +153,10 @@ public class CharacterService {
 			.isActive(false)
 			.version(1)
 			.sortOrder(request.sortOrder() == null ? 1 : request.sortOrder())
-			.groupId(newPromptGroupId())
+			.groupId(0L)
 			.useYn(UseYn.Y)
 			.build());
+		prompt.updateGroupId(prompt.getId());
 		return new IdResponse(prompt.getId());
 	}
 
@@ -207,6 +218,27 @@ public class CharacterService {
 			.orElseThrow(() -> new CustomException(ErrorCode.USER_001));
 	}
 
+	private UserApiKey resolveOwnedApiKey(Long apiKeyId, User user) {
+		if (apiKeyId == null) {
+			return null;
+		}
+		UserApiKey apiKey = userApiKeyRepository.findByIdAndUseYn(apiKeyId, UseYn.Y)
+			.orElseThrow(() -> new CustomException(ErrorCode.USER_001));
+		if (!apiKey.getUser().getId().equals(user.getId())) {
+			throw new CustomException(ErrorCode.COMMON_001);
+		}
+		return apiKey;
+	}
+
+	private UserApiKeySummary toApiKeySummary(UserApiKey apiKey) {
+		if (apiKey == null) {
+			return null;
+		}
+		String decrypted = encryptionUtil.decrypt(apiKey.getEncryptedKey()).trim();
+		int visibleLength = Math.min(4, decrypted.length());
+		return new UserApiKeySummary(apiKey.getId(), apiKey.getLabel(), apiKey.getAiModel().name(), "••••" + decrypted.substring(decrypted.length() - visibleLength));
+	}
+
 	private void requireOwner(Character character) {
 		if (!character.getUser().getId().equals(SecurityUtils.currentUser().id())) {
 			throw new CustomException(ErrorCode.CHARACTER_002);
@@ -225,9 +257,5 @@ public class CharacterService {
 		if (currentUser().getSystemRole() != SystemRole.ADMIN) {
 			throw new CustomException(ErrorCode.COMMON_001);
 		}
-	}
-
-	private long newPromptGroupId() {
-		return ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE);
 	}
 }

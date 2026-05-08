@@ -76,6 +76,10 @@ public class Character extends BaseEntity {
 		this.name = name;
 	}
 
+	public void updateApiKey(UserApiKey apiKey) {
+		this.apiKey = apiKey;
+	}
+
 	public void updateStatus(CharacterStatus status) {
 		this.status = status;
 	}
