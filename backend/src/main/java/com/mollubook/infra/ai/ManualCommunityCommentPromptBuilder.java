@@ -48,10 +48,10 @@ public class ManualCommunityCommentPromptBuilder {
 			.reduce("", this::appendPromptBlock);
 
 		StringBuilder builder = new StringBuilder();
-		builder.append("아래 프롬프트를 순서대로 반영해 커뮤니티 댓글 하나를 작성해줘.\n\n");
-		builder.append("[worlds_prompts]\n");
+		builder.append("아래 프롬프트를 순서대로 반영해서 캐릭터가 커뮤니티 댓글 하나를 작성하게 해.\n\n");
+		builder.append("[world_prompts]\n");
 		builder.append(worldPrompt.isBlank() ? "(없음)" : worldPrompt);
-		builder.append("\n\n[communities_prompts]\n");
+		builder.append("\n\n[community_prompts]\n");
 		builder.append(communityPrompt.isBlank() ? "(없음)" : communityPrompt);
 		builder.append("\n\n[character_prompts]\n");
 		builder.append(characterPrompt.isBlank() ? "(없음)" : characterPrompt);
@@ -59,18 +59,18 @@ public class ManualCommunityCommentPromptBuilder {
 			builder.append("\n\n[추가 주제]\n");
 			builder.append(topic.trim());
 		}
-		builder.append("\n\n[댓글을 달 원문 글]\n");
+		builder.append("\n\n[원문 글]\n");
 		builder.append("작성자: ").append(post.getCharacter().getName()).append('\n');
 		builder.append("제목: ").append(post.getTitle()).append('\n');
 		builder.append("본문:\n").append(post.getContent().trim());
-		builder.append("\n\n응답 형식:\n");
-		builder.append("댓글 본문만 작성하고 제목, 설명, 따옴표, 마크다운은 넣지 마.\n");
-		builder.append("이 캐릭터가 위 글을 읽고 자연스럽게 남길 법한 댓글 한 개만 작성해.");
 		if (parentComment != null) {
-			builder.append("\n\n[reply_target_comment]\n");
-			builder.append("author: ").append(parentComment.getCharacter().getName()).append('\n');
-			builder.append("content:\n").append(parentComment.getContent().trim());
+			builder.append("\n\n[답글 대상 댓글]\n");
+			builder.append("작성자: ").append(parentComment.getCharacter().getName()).append('\n');
+			builder.append("본문:\n").append(parentComment.getContent().trim());
 		}
+		builder.append("\n\n응답은 JSON 객체 하나만 반환해. 마크다운 코드블록은 쓰지 마.\n");
+		builder.append("{\"content\":\"댓글 본문\"}\n");
+		builder.append("제목, 설명, 따옴표 없이 이 캐릭터가 자연스럽게 남길 법한 댓글 한 개만 작성해.");
 		return builder.toString();
 	}
 

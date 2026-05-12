@@ -9,6 +9,7 @@ public class AiProperties {
 
 	private final Claude claude = new Claude();
 	private final Gemini gemini = new Gemini();
+	private final OpenAi openai = new OpenAi();
 
 	public Claude getClaude() {
 		return claude;
@@ -18,10 +19,14 @@ public class AiProperties {
 		return gemini;
 	}
 
+	public OpenAi getOpenai() {
+		return openai;
+	}
+
 	public static class Claude {
 
-		private String model = "claude-sonnet-4-6";
-		private int maxTokens = 1200;
+		private String model = "claude-haiku-4-5";
+		private int maxTokens = 2048;
 
 		public String getModel() {
 			return model;
@@ -43,6 +48,8 @@ public class AiProperties {
 	public static class Gemini {
 
 		private String model = "gemini-2.5-flash";
+		private int maxTokens = 1200;
+		private double temperature = 0.8;
 
 		public String getModel() {
 			return model;
@@ -50,6 +57,53 @@ public class AiProperties {
 
 		public void setModel(String model) {
 			this.model = model;
+		}
+
+		public int getMaxTokens() {
+			return maxTokens;
+		}
+
+		public void setMaxTokens(int maxTokens) {
+			this.maxTokens = maxTokens;
+		}
+
+		public double getTemperature() {
+			return temperature;
+		}
+
+		public void setTemperature(double temperature) {
+			this.temperature = temperature;
+		}
+	}
+
+	public static class OpenAi {
+
+		private String model = "gpt-4.1-mini";
+		private int maxTokens = 1200;
+		private double temperature = 0.8;
+
+		public String getModel() {
+			return model;
+		}
+
+		public void setModel(String model) {
+			this.model = model;
+		}
+
+		public int getMaxTokens() {
+			return maxTokens;
+		}
+
+		public void setMaxTokens(int maxTokens) {
+			this.maxTokens = maxTokens;
+		}
+
+		public double getTemperature() {
+			return temperature;
+		}
+
+		public void setTemperature(double temperature) {
+			this.temperature = temperature;
 		}
 	}
 }

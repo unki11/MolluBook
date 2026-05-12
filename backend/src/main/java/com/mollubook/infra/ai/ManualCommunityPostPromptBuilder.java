@@ -10,8 +10,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class ManualCommunityPostPromptBuilder {
 
-	private static final String FINAL_INSTRUCTION = "해당 설정을 기반으로 해당 캐릭터가 작성할만한 커뮤니티 글과 제목을 작성해줘";
-
 	private final WorldPromptRepository worldPromptRepository;
 	private final CommunityPromptRepository communityPromptRepository;
 	private final CharacterPromptRepository characterPromptRepository;
@@ -44,10 +42,10 @@ public class ManualCommunityPostPromptBuilder {
 			.reduce("", this::appendPromptBlock);
 
 		StringBuilder builder = new StringBuilder();
-		builder.append("아래 프롬프트를 순서대로 적용해 커뮤니티 글을 작성해줘.\n\n");
-		builder.append("[worlds_prompts]\n");
+		builder.append("아래 프롬프트를 순서대로 적용해서 캐릭터가 커뮤니티에 올릴 글을 작성해.\n\n");
+		builder.append("[world_prompts]\n");
 		builder.append(worldPrompt.isBlank() ? "(없음)" : worldPrompt);
-		builder.append("\n\n[communities_prompts]\n");
+		builder.append("\n\n[community_prompts]\n");
 		builder.append(communityPrompt.isBlank() ? "(없음)" : communityPrompt);
 		builder.append("\n\n[character_prompts]\n");
 		builder.append(characterPrompt.isBlank() ? "(없음)" : characterPrompt);
@@ -55,10 +53,9 @@ public class ManualCommunityPostPromptBuilder {
 			builder.append("\n\n[추가 주제]\n");
 			builder.append(topic.trim());
 		}
-		builder.append("\n\n응답 형식:\n");
-		builder.append("제목: 한 줄 제목\n");
-		builder.append("내용:\n본문 여러 줄\n\n");
-		builder.append(FINAL_INSTRUCTION);
+		builder.append("\n\n응답은 JSON 객체 하나만 반환해. 마크다운 코드블록은 쓰지 마.\n");
+		builder.append("{\"title\":\"글 제목\",\"content\":\"본문\"}\n");
+		builder.append("해당 설정을 기반으로 이 캐릭터가 직접 쓴 것 같은 커뮤니티 글과 제목을 작성해.");
 		return builder.toString();
 	}
 
