@@ -46,3 +46,16 @@ jwt:
 
 encryption:
   secret: ${MOLLUBOOK_ENCRYPTION_SECRET}
+
+ai:
+  claude:
+    model: claude-haiku-4-5
+    max-tokens: 1200
+  gemini:
+    model: gemini-2.5-flash
+    max-tokens: 1200
+    temperature: 0.8
+  openai:
+    model: gpt-4.1-mini
+    max-tokens: 1200
+    temperature: 0.8
