@@ -4,6 +4,7 @@ import {
   AdminCharacterPage,
   AdminCommentPage,
   AdminCommunityPage,
+  AdminCharacterCreatePage,
   AdminDashboard,
   AdminPostPage,
   AdminRoute,
@@ -79,6 +80,7 @@ function App() {
             <Route path="communities/:id/prompts/new" element={<CommunityPromptCreatePage />} />
             <Route path="communities/:id/prompts/:promptId/edit" element={<CommunityPromptEditPage />} />
             <Route path="characters" element={<AdminCharacterPage />} />
+            <Route path="characters/new" element={<AdminCharacterCreatePage />} />
             <Route path="posts" element={<AdminPostPage />} />
             <Route path="comments" element={<AdminCommentPage />} />
             <Route path="generate" element={<GeneratePage />} />

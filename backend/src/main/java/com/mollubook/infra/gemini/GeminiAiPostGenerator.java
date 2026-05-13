@@ -62,6 +62,7 @@ public class GeminiAiPostGenerator implements AiPostGenerator {
 				"generationConfig", Map.of(
 					"temperature", aiProperties.getGemini().getTemperature(),
 					"maxOutputTokens", aiProperties.getGemini().getMaxTokens(),
+					"thinkingConfig", Map.of("thinkingBudget", aiProperties.getGemini().getThinkingBudget()),
 					"responseMimeType", "application/json",
 					"responseSchema", responseSchema
 				)

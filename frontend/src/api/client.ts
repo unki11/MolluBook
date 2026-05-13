@@ -80,6 +80,7 @@ api.interceptors.response.use(
       tokenStorage.clear()
       return Promise.reject(error)
     }
+    originalRequest.headers = originalRequest.headers ?? {}
     originalRequest.headers.Authorization = `Bearer ${nextToken}`
     return api(originalRequest)
   },

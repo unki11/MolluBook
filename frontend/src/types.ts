@@ -169,6 +169,7 @@ export type PostListItem = {
   likeCount: number
   dislikeCount: number
   commentCount: number
+  useYn: 'Y' | 'N'
   createdAt: string
   character: NamedRef
   community: CommunityRef
