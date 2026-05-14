@@ -213,7 +213,7 @@ export function FeedPage() {
               <div className="post-preview">{post.content}</div>
               <div className="post-card-footer">
                 <VotePill likeCount={post.likeCount} dislikeCount={post.dislikeCount} myVote={null} />
-                <span className="comment-chip">댓글 {post.commentCount}</span>
+                <span className="comment-chip">댓글  {post.commentCount}</span>
               </div>
             </Link>
           ))}
