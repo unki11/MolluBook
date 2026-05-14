@@ -48,8 +48,9 @@ public class AiProperties {
 	public static class Gemini {
 
 		private String model = "gemini-2.5-flash";
-		private int maxTokens = 1200;
+		private int maxTokens = 4096;
 		private double temperature = 0.8;
+		private int thinkingBudget = 0;
 
 		public String getModel() {
 			return model;
@@ -73,6 +74,14 @@ public class AiProperties {
 
 		public void setTemperature(double temperature) {
 			this.temperature = temperature;
+		}
+
+		public int getThinkingBudget() {
+			return thinkingBudget;
+		}
+
+		public void setThinkingBudget(int thinkingBudget) {
+			this.thinkingBudget = thinkingBudget;
 		}
 	}
 

@@ -25,6 +25,7 @@ public final class PostDtos {
 		int likeCount,
 		int dislikeCount,
 		int commentCount,
+		String useYn,
 		LocalDateTime createdAt,
 		NamedRef character,
 		CommunityRef community,

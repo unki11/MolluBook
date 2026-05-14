@@ -90,9 +90,11 @@ public class PostService {
 
 	@Transactional
 	public void deletePost(Long postId) {
-		postRepository.findById(postId)
-			.orElseThrow(() -> new CustomException(ErrorCode.COMMON_002))
-			.delete();
+		Post post = postRepository.findById(postId)
+			.orElseThrow(() -> new CustomException(ErrorCode.COMMON_002));
+		commentRepository.findByPostIdOrderByCreatedAtAsc(postId)
+			.forEach(comment -> comment.delete());
+		post.delete();
 	}
 
 	private PostListItem toListItem(Post post) {
@@ -103,6 +105,7 @@ public class PostService {
 			post.getLikeCount(),
 			post.getDislikeCount(),
 			post.getCommentCount(),
+			post.getUseYn().name(),
 			post.getCreatedAt(),
 			new NamedRef(post.getCharacter().getId(), post.getCharacter().getName()),
 			new CommunityRef(post.getCommunity().getId(), post.getCommunity().getName(), post.getCommunity().getSlug()),

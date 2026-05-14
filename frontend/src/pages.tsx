@@ -213,7 +213,7 @@ export function FeedPage() {
               <div className="post-preview">{post.content}</div>
               <div className="post-card-footer">
                 <VotePill likeCount={post.likeCount} dislikeCount={post.dislikeCount} myVote={null} />
-                <span className="comment-chip">댓글 {post.commentCount}</span>
+                <span className="comment-chip">댓글  {post.commentCount}</span>
               </div>
             </Link>
           ))}
@@ -603,11 +603,15 @@ export function CharacterCreatePage() {
   return <CharacterFormPage mode="create" />
 }
 
+export function AdminCharacterCreatePage() {
+  return <CharacterFormPage admin mode="create" />
+}
+
 export function CharacterEditPage() {
   return <CharacterFormPage mode="edit" />
 }
 
-function CharacterFormPage({ mode }: { mode: 'create' | 'edit' }) {
+function CharacterFormPage({ admin = false, mode }: { admin?: boolean; mode: 'create' | 'edit' }) {
   const params = useParams()
   const navigate = useNavigate()
   const communitiesQuery = useCommunities()
@@ -636,11 +640,10 @@ function CharacterFormPage({ mode }: { mode: 'create' | 'edit' }) {
     setMessage('캐릭터 정보를 저장했습니다.')
   }
 
-  return (
-    <AppFrame communities={communitiesQuery.communities}>
+  const content = (
       <div className="stack wide-stack">
         <div className="breadcrumb">
-          <Link to="/">홈</Link>
+          <Link to={admin ? '/admin/characters' : '/'}>{admin ? '캐릭터 관리' : '홈'}</Link>
           <span>/</span>
           <span>{mode === 'create' ? '캐릭터 생성' : '캐릭터 수정'}</span>
         </div>
@@ -675,8 +678,9 @@ function CharacterFormPage({ mode }: { mode: 'create' | 'edit' }) {
           </form>
         </SectionCard>
       </div>
-    </AppFrame>
   )
+
+  return admin ? <AdminFrame>{content}</AdminFrame> : <AppFrame communities={communitiesQuery.communities}>{content}</AppFrame>
 }
 
 export function CharacterDetailPage() {
@@ -1991,7 +1995,7 @@ export function AdminCharacterPage() {
       <SectionCard
         title="캐릭터 관리"
         action={
-          <Link className="primary-btn" to="/characters/new">
+          <Link className="primary-btn" to="/admin/characters/new">
             캐릭터 생성
           </Link>
         }
@@ -2027,7 +2031,7 @@ export function AdminPostPage() {
 
   async function removePost(postId: number) {
     await postApi.remove(postId)
-    setPosts((current) => current.filter((post) => post.id !== postId))
+    setPosts((current) => current.map((post) => (post.id === postId ? { ...post, useYn: 'N' } : post)))
   }
 
   return (
@@ -2039,7 +2043,8 @@ export function AdminPostPage() {
               <div className="row-top">
                 <div className="row-title serif">{post.title}</div>
                 <div className="row-side">
-                  <button className="gnb-btn" onClick={() => void removePost(post.id)}>
+                  {post.useYn === 'N' ? <span className="badge danger">삭제됨</span> : null}
+                  <button className="gnb-btn" disabled={post.useYn === 'N'} onClick={() => void removePost(post.id)}>
                     삭제
                   </button>
                   <Link className="gnb-btn primary" to={`/posts/${post.id}`}>
